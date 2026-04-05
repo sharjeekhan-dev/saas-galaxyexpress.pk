@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 COPY package*.json ./
@@ -11,7 +11,8 @@ COPY . .
 
 # Run build if using TypeScript (omitted for JS version)
 
-FROM node:20-alpine
+FROM node:20-slim
+RUN apt-get update && apt-get install -y openssl
 WORKDIR /app
 
 COPY --from=builder /app/package*.json ./
