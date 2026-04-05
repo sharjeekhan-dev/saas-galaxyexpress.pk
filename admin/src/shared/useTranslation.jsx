@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 // Global cache to avoid redundant fetching across components
 let globalDict = null;
