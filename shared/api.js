@@ -48,13 +48,31 @@ class ApiClient {
     const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
 
-    const res = await fetch(`${this.baseUrl}${path}`, opts);
-    const data = await res.json();
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, opts);
+      
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}: ${text.slice(0, 100)}...`);
+        }
+        return text;
+      }
 
-    if (!res.ok) {
-      throw new Error(data.error || 'Request failed');
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Request failed');
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        throw new Error('Network Error: Unable to reach API endpoint. Please check if API is running (502/CORS).');
+      }
+      throw err;
     }
-    return data;
   }
 
   get(path) { return this.request('GET', path); }
