@@ -1,0 +1,861 @@
+// Append this at the end of existing api/prisma/schema.prisma
+// If replacing, make sure to preserve everything above!
+// I'll rewrite the entire file to be safe.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  MANAGER
+  CASHIER
+  WAITER
+  VENDOR
+  RIDER
+  CUSTOMER
+  KITCHEN
+  HR_ADMIN
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  ONLINE
+  B2B
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE_STRIPE
+  ONLINE_GOPAYFAST
+  WALLET
+  UPI
+  STORE_CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum InventoryTxType {
+  IN
+  OUT
+  ADJUSTMENT
+  WASTAGE
+  PRODUCTION
+  DEPT_ISSUE
+  DEPT_RECEIVE
+}
+
+// =============================================
+// MODULE: TENANT & SUPER ADMIN
+// =============================================
+
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String
+  subdomain       String   @unique
+  logo            String?
+  invoiceLogo     String?  // NEW: specific logo for invoices
+  isActive        Boolean  @default(true)
+  plan            SubscriptionPlan @default(BASIC)
+  planFeatures    Json?    
+  billingExpiry   DateTime?
+  stripeAccountId String?
+  goPayFastKey    String?
+  aiApiKey        String?
+  themeSettings   Json?    
+  
+  users           User[]
+  outlets         Outlet[]
+  products        Product[]
+  orders          Order[]
+  accounts        Account[]
+  suppliers       Supplier[]
+  shifts          Shift[]
+  coupons         Coupon[]
+  banners         Banner[]
+  blogPosts       BlogPost[]
+  apiKeys         ApiKeyConfig[]
+  departments     Department[]
+  employees       Employee[]
+  commissionLedger CommissionLedger[]
+  journalEntries  JournalEntry[]
+  dailyClosings   DailyClosing[]
+  invoiceTemplates InvoiceTemplate[] // NEW
+  printers        Printer[]          // NEW
+  translations    Translation[]      // NEW
+  faqs            Faq[]              // NEW
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Lead {
+  id              String   @id @default(uuid())
+  name            String
+  businessName    String
+  businessType    String
+  requirements    String
+  contactMethod   String
+  status          String   @default("NEW")
+  createdAt       DateTime @default(now())
+}
+
+// =============================================
+// MODULE: USERS & RBAC
+// =============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  phone     String?  @unique
+  password  String
+  name      String
+  avatar    String?
+  fcmToken  String?  // NEW: Firebase Cloud Messaging token for pushes
+  role      Role
+  isActive  Boolean  @default(true)
+  otpCode   String?
+  otpExpiry DateTime?
+  darkMode  Boolean  @default(true)
+  language  String   @default("EN") // NEW: EN or UR
+  
+  tenantId  String?
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
+  
+  vendorProfile     VendorProfile?
+  riderProfile      RiderProfile?
+  customerProfile   CustomerProfile?
+  
+  shifts    Shift[]
+  orders    Order[]
+  wallets   Wallet[]
+  employee  Employee?
+  notifications Notification[] // NEW
+  sentMessages Message[] @relation("SentMessages") // NEW
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =============================================
+// MODULE: OUTLETS & TABLES
+// =============================================
+
+model Outlet {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  address     String
+  phone       String?
+  lat         Float?
+  lng         Float?
+  taxRate     Float    @default(0)
+  serviceChg  Float    @default(0)
+  serviceChgType String @default("PERCENTAGE")
+  isActive    Boolean  @default(true)
+  operatingHours Json?
+  
+  tables      Table[]
+  inventory   Stock[]
+  orders      Order[]
+  shifts      Shift[]
+  kdsStations KdsStation[]
+  departments Department[]
+  dailyClosings DailyClosing[]
+  printers    Printer[] // NEW
+
+  createdAt   DateTime @default(now())
+}
+
+model Table {
+  id         String   @id @default(uuid())
+  outletId   String
+  outlet     Outlet   @relation(fields: [outletId], references: [id])
+  name       String
+  capacity   Int      @default(4)
+  qrCode     String?
+  isOccupied Boolean  @default(false)
+  section    String?
+  
+  orders     Order[]
+}
+
+model KdsStation {
+  id        String @id @default(uuid())
+  outletId  String
+  outlet    Outlet @relation(fields: [outletId], references: [id])
+  name      String 
+  categories String? 
+}
+
+// =============================================
+// MODULE: INVENTORY & PRODUCTION
+// =============================================
+
+model Product {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  name          String
+  sku           String   @unique
+  category      String
+  description   String?
+  price         Float
+  cost          Float    @default(0)
+  isRawMaterial Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  image         String?
+  
+  vendorId      String?
+  vendor        VendorProfile? @relation(fields: [vendorId], references: [id])
+  commission    Float?
+
+  stocks        Stock[]
+  orderItems    OrderItem[]
+  recipe        Recipe?
+  recipeItems   RecipeItem[]
+  modifiers     ProductModifier[]
+  variants      ProductVariant[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProductModifier {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  price     Float
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String  
+  price     Float
+  cost      Float   @default(0)
+  sku       String?
+}
+
+model Stock {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  outletId     String
+  outlet       Outlet   @relation(fields: [outletId], references: [id])
+  quantity     Float    @default(0)
+  lowThreshold Float    @default(0)
+  
+  transactions InventoryTransaction[]
+}
+
+model InventoryTransaction {
+  id          String   @id @default(uuid())
+  stockId     String
+  stock       Stock    @relation(fields: [stockId], references: [id])
+  type        InventoryTxType
+  quantity    Float
+  reason      String?
+  batchNumber String?
+  expiryDate  DateTime?
+  departmentId String?
+  performedBy String?
+  
+  createdAt   DateTime @default(now())
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  contact     String
+  email       String?
+  terms       String?
+  
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id           String   @id @default(uuid())
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  expectedDate DateTime?
+  status       String   @default("DRAFT")
+  totalAmount  Float    @default(0)
+  
+  lines        PurchaseOrderLine[]
+  createdAt    DateTime @default(now())
+}
+
+model PurchaseOrderLine {
+  id          String   @id @default(uuid())
+  poId        String
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productName String
+  quantity    Float
+  unitPrice   Float
+}
+
+model Recipe {
+  id           String   @id @default(uuid())
+  productId    String   @unique
+  product      Product  @relation(fields: [productId], references: [id])
+  instructions String?
+  batchYield   Float    @default(1)
+  
+  items        RecipeItem[]
+  productions  Production[]
+}
+
+model RecipeItem {
+  id            String   @id @default(uuid())
+  recipeId      String
+  recipe        Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  rawMaterialId String
+  rawMaterial   Product  @relation(fields: [rawMaterialId], references: [id])
+  quantity      Float
+}
+
+model Production {
+  id          String   @id @default(uuid())
+  recipeId    String
+  recipe      Recipe   @relation(fields: [recipeId], references: [id])
+  batchNumber String?
+  quantity    Float
+  notes       String?
+  producedAt  DateTime @default(now())
+}
+
+// =============================================
+// MODULE: FINANCE & ACCOUNTS
+// =============================================
+
+model Account {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  type        String   
+  balance     Float    @default(0)
+  
+  journalLines JournalLine[]
+}
+
+model JournalEntry {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  date        DateTime @default(now())
+  reference   String?
+  description String
+  
+  lines       JournalLine[]
+}
+
+model JournalLine {
+  id          String   @id @default(uuid())
+  journalId   String
+  journal     JournalEntry @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+  debit       Float    @default(0)
+  credit      Float    @default(0)
+}
+
+// =============================================
+// MODULE: ORDERS, POS & SHIFTS
+// =============================================
+
+model Shift {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  outletId    String
+  outlet      Outlet   @relation(fields: [outletId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  openingCash Float
+  closingCash Float?
+  notes       String?
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  orderNumber   String?  
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  outletId      String
+  outlet        Outlet   @relation(fields: [outletId], references: [id])
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  tableId       String?
+  table         Table?   @relation(fields: [tableId], references: [id])
+  
+  type          OrderType
+  status        OrderStatus @default(PENDING)
+  subtotal      Float    @default(0)
+  taxAmount     Float    @default(0)
+  serviceCharge Float    @default(0)
+  discount      Float    @default(0)
+  totalAmount   Float
+  couponId      String?
+  coupon        Coupon?  @relation(fields: [couponId], references: [id])
+  
+  items         OrderItem[]
+  payments      Payment[]
+  
+  riderId       String?
+  rider         RiderProfile? @relation(fields: [riderId], references: [id])
+  
+  parentOrderId String?  
+  refundReason  String?
+  deliveryAddress String?
+  deliveryLat   Float?
+  deliveryLng   Float?
+  
+  commissionLedger CommissionLedger[]
+  chatSessions     ChatSession[] // NEW: Linked chats (Rider <-> Customer)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  variantName String?
+  quantity    Float
+  unitPrice   Float
+  modifiers   Json?    
+  notes       String?
+  kdsStatus   String   @default("PENDING")
+  kdsStation  String?
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method      PaymentMethod
+  amount      Float
+  status      PaymentStatus @default(PENDING)
+  reference   String?
+  gatewayResponse Json?
+  createdAt   DateTime @default(now())
+}
+
+// =============================================
+// MODULE: COUPONS & WALLET
+// =============================================
+
+model Coupon {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  code          String
+  type          String   @default("PERCENTAGE") 
+  value         Float
+  minOrderAmount Float?
+  maxDiscount   Float?
+  usageLimit    Int?
+  usedCount     Int      @default(0)
+  validFrom     DateTime @default(now())
+  validTo       DateTime?
+  isActive      Boolean  @default(true)
+  
+  orders        Order[]
+  
+  @@unique([tenantId, code])
+}
+
+model Wallet {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  balance     Float    @default(0)
+  
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id])
+  type        String   
+  amount      Float
+  reference   String?  
+  balanceAfter Float
+  createdAt   DateTime @default(now())
+}
+
+// =============================================
+// MODULE: VENDORS & RIDERS
+// =============================================
+
+model VendorProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  businessName    String
+  invoiceLogo     String?  // NEW: Vendor specific invoice logo
+  cnic            String?
+  license         String?
+  bankName        String?
+  bankAccount     String?
+  bankIban        String?
+  documents       Json?    
+  isVerified      Boolean  @default(false)
+  verificationStatus String @default("PENDING") 
+  commissionType  String   @default("PERCENTAGE")
+  commissionValue Float    @default(10)
+  
+  products        Product[]
+  payouts         Payout[]
+  printers        Printer[] // NEW: Vendor specific printers
+}
+
+model RiderProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  vehicleType     String
+  vehiclePlate    String?
+  cnic            String?
+  license         String?
+  bankName        String?
+  bankAccount     String?
+  documents       Json?
+  isVerified      Boolean  @default(false)
+  verificationStatus String @default("PENDING")
+  isAvailable     Boolean  @default(true)
+  currentLat      Float?
+  currentLng      Float?
+  
+  orders          Order[]
+  earnings        Payout[]
+}
+
+model CustomerProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  savedAddress  String?
+  addressLat    Float?
+  addressLng    Float?
+  loyaltyPoints Int      @default(0)
+}
+
+model Payout {
+  id          String   @id @default(uuid())
+  vendorId    String?
+  vendor      VendorProfile? @relation(fields: [vendorId], references: [id])
+  riderId     String?
+  rider       RiderProfile? @relation(fields: [riderId], references: [id])
+  amount      Float
+  status      String   @default("PENDING")
+  reference   String?
+  createdAt   DateTime @default(now())
+}
+
+model CommissionLedger {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  vendorId    String?
+  riderId     String?
+  orderAmount Float
+  commissionRate Float
+  commissionAmount Float
+  type        String   @default("PERCENTAGE")
+  createdAt   DateTime @default(now())
+}
+// =============================================
+// MODULE: CONTENT (Banners, Blog) & API KEYS
+// =============================================
+
+model Banner {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  title       String
+  imageUrl    String?
+  videoUrl    String?
+  linkUrl     String?
+  position    Int      @default(0)
+  isActive    Boolean  @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model BlogPost {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  title       String
+  slug        String   @unique
+  content     String
+  excerpt     String?
+  coverImage  String?
+  author      String?
+  tags        String?
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ApiKeyConfig {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  service     String   
+  keyName     String
+  keyValue    String   
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([tenantId, service, keyName])
+}
+
+// =============================================
+// MODULE: HR & DAILY CLOSING
+// =============================================
+
+model Department {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  outletId    String?
+  outlet      Outlet?  @relation(fields: [outletId], references: [id])
+  name        String
+  
+  employees   Employee[]
+}
+
+model Employee {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  employeeCode  String?
+  designation   String?
+  salary        Float    @default(0)
+  joinDate      DateTime @default(now())
+  bankAccount   String?
+  cnic          String?
+  emergencyContact String?
+  
+  attendance    Attendance[]
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  date        DateTime @default(now())
+  checkIn     DateTime?
+  checkOut    DateTime?
+  status      String   @default("PRESENT") 
+  notes       String?
+}
+
+model DailyClosing {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  outletId      String
+  outlet        Outlet   @relation(fields: [outletId], references: [id])
+  date          DateTime
+  totalSales    Float    @default(0)
+  totalTax      Float    @default(0)
+  totalDiscount Float    @default(0)
+  totalOrders   Int      @default(0)
+  cashSales     Float    @default(0)
+  cardSales     Float    @default(0)
+  onlineSales   Float    @default(0)
+  wastageValue  Float    @default(0)
+  notes         String?
+  closedBy      String?
+  createdAt     DateTime @default(now())
+  
+  @@unique([tenantId, outletId, date])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  orderId   String
+  userId    String?
+  rating    Int      @default(5)
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  userId    String?
+  action    String
+  entity    String?  
+  entityId  String?
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
+
+// =============================================
+// NEW MODULES: PRINTING, CHAT, TRANSLATIONS
+// =============================================
+
+model Printer {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  outletId    String?
+  outlet      Outlet?  @relation(fields: [outletId], references: [id])
+  vendorId    String?
+  vendor      VendorProfile? @relation(fields: [vendorId], references: [id])
+  
+  name        String   // "Kitchen Thermal", "Main Invoice A4"
+  ipAddress   String
+  port        Int      @default(9100)
+  type        String   @default("THERMAL") // THERMAL, A4
+  paperWidth  Int      @default(80) // 80mm, 58mm
+  department  String?  // Kitchen, Bar, Retail
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InvoiceTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  type        String   @default("THERMAL") // THERMAL, A4
+  htmlContent String   // Liquid/Handlebars HTML template
+  isDefault   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ChatSession {
+  id          String   @id @default(uuid())
+  contextType String   // ORDER, SUPPORT, VENDOR_ADMIN
+  orderId     String?
+  order       Order?   @relation(fields: [orderId], references: [id])
+  isActive    Boolean  @default(true)
+  
+  // Storing participant IDs in a JSON array or string since dynamic relations are tricky.
+  // For simplicity, we just store participant user IDs as JSON: ["id1", "id2"]
+  participants Json
+  
+  messages    Message[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  senderId      String
+  sender        User     @relation("SentMessages", fields: [senderId], references: [id])
+  
+  content       String
+  messageType   String   @default("TEXT") // TEXT, IMAGE, AUDIO
+  attachmentUrl String?
+  isRead        Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+}
+
+model Translation {
+  id          String   @id @default(uuid())
+  tenantId    String?  // null means global system translation
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  key         String   // e.g. "ui.button.checkout"
+  en          String   // English
+  ur          String   // Roman Urdu
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([tenantId, key])
+}
+
+model Faq {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  question    String
+  answer      String
+  targetRole  String?  // CUSTOMER, VENDOR, RIDER (null = ALL)
+  position    Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String   
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  type        String   @default("INFO") // ORDER_UPDATE, CHAT, ALERT
+  link        String?  // Deep link or relative path
+  isRead      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+}
