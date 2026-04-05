@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { ShoppingBag, ChevronRight, Star, Clock, MapPin } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 const MENU = [
   { id: 1, name: 'Neon Burger', desc: 'Double patty, glowing secret sauce, brioche bun.', price: 12.99, cat: 'Burgers' },

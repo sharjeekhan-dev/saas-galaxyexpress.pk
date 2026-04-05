@@ -5,7 +5,7 @@ import { Bar, Line } from 'react-chartjs-2';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 const headers = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('erp_token')}` });
 
 // ═══════════════════════════════════════
