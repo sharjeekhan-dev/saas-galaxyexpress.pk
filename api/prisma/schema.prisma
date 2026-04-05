@@ -8,7 +8,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 enum Role {
@@ -159,7 +160,7 @@ model User {
   
   shifts    Shift[]
   orders    Order[]
-  wallets   Wallet[]
+  wallet    Wallet?
   employee  Employee?
   notifications Notification[] // NEW
   sentMessages Message[] @relation("SentMessages") // NEW
