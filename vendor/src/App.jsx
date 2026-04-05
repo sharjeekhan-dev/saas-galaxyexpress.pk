@@ -53,21 +53,23 @@ function LoginScreen({ onLogin }) {
 
   const handleSubmit = async(e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
-      const data = await res.json();
-      if(!res.ok){ setError(data.error); setLoading(false); return; }
-      if(data.user.role !== 'VENDOR' && data.user.role !== 'TENANT_ADMIN'){ setError('Vendor access required.'); setLoading(false); return; }
-      localStorage.setItem('erp_token', data.token); localStorage.setItem('erp_user', JSON.stringify(data.user));
-      onLogin(data);
-    } catch { setError('Connection failed'); setLoading(false); }
+    // UI DEMO BYPASS
+    setTimeout(() => {
+      const mockUser = { id: 'vendor_admin', name: 'Store Admin', role: 'VENDOR', email: email };
+      localStorage.setItem('erp_token', 'mock_token_789');
+      localStorage.setItem('erp_user', JSON.stringify(mockUser));
+      onLogin({ user: mockUser });
+    }, 400);
   };
 
   return (
-    <div className="login-page"><div className="login-box">
-      <div className="login-icon">🏪</div>
-      <h1>Vendor Portal</h1>
-      <p>Manage your stores, stock, and accounts</p>
+    <div className="login-page">
+      <div className="login-container">
+        <div className="login-brand">
+          <div className="login-brand-icon">🏪</div>
+          <h1>Vendor Portal</h1>
+          <p>Manage your stores, stock, and accounts</p>
+        </div>
       {error && <div className="login-err">{error}</div>}
       <form className="login-form" onSubmit={handleSubmit}>
         <div className="fg"><label>Email</label><input className="fi" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></div>

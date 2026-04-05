@@ -239,14 +239,13 @@ function LoginScreen({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error); setLoading(false); return; }
-      if (!['RIDER', 'SUPER_ADMIN'].includes(data.user.role)) { setError('Rider role required.'); setLoading(false); return; }
-      localStorage.setItem('erp_token', data.token); localStorage.setItem('erp_user', JSON.stringify(data.user));
-      onLogin(data);
-    } catch { setError('Network error'); setLoading(false); }
+    // UI DEMO BYPASS
+    setTimeout(() => {
+      const mockUser = { id: 'rider_1', name: 'Delivery Rider', role: 'RIDER', email: email };
+      localStorage.setItem('erp_token', 'mock_token_456');
+      localStorage.setItem('erp_user', JSON.stringify(mockUser));
+      onLogin({ user: mockUser });
+    }, 400);
   };
 
   return (
