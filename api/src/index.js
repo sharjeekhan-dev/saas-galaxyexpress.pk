@@ -1,5 +1,8 @@
 import express from 'express';
 import http from 'http';
+import { exec } from 'child_process';
+import util from 'util';
+const execPromise = util.promisify(exec);
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -91,6 +94,24 @@ app.use('/api/notifications', notificationsRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), routes: 19 });
+});
+
+// Auto DB Setup Endpoint
+app.get('/api/setup', async (req, res) => {
+  try {
+    const { stdout: pushOut } = await execPromise('npx prisma db push');
+    const { stdout: seedOut } = await execPromise('node prisma/seed.js');
+    res.send(`
+      <div style="font-family: sans-serif; padding: 20px; color: green;">
+        <h2 style="color: blue;">Database Setup Successful! 🎉</h2>
+        <pre>${pushOut}</pre>
+        <pre>${seedOut}</pre>
+        <p>Aap wapas aa kar Vercel per Frontend deploy kar saktay hain!</p>
+      </div>
+    `);
+  } catch (error) {
+    res.status(500).send(`Error setting up database: ${error.message} - ${error.stdout} - ${error.stderr}`);
+  }
 });
 
 // Global error handling middleware
