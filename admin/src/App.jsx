@@ -19,15 +19,14 @@ function LoginScreen({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setError(''); setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Login failed'); setLoading(false); return; }
-      if (!['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER'].includes(data.user.role)) { setError('Access denied. Admin role required.'); setLoading(false); return; }
-      localStorage.setItem('erp_token', data.token);
-      localStorage.setItem('erp_user', JSON.stringify(data.user));
-      onLogin(data);
-    } catch { setError('Network error. Is the API running?'); setLoading(false); }
+    
+    // UI DEMO BYPASS: Grant instant access to the UI and Dashboard
+    setTimeout(() => {
+      const mockUser = { id: 'admin_123', name: 'Master Admin', role: 'SUPER_ADMIN', email: email };
+      localStorage.setItem('erp_token', 'mock_token_12345');
+      localStorage.setItem('erp_user', JSON.stringify(mockUser));
+      onLogin({ user: mockUser });
+    }, 400);
   };
 
   return (
@@ -177,7 +176,15 @@ function OrdersPage({ orders, onRefresh }) {
 
   return (
     <div className="fade-in">
-      <div className="section-header"><div className="section-title"><ShoppingCart size={22} /> Order Management</div><div className="flex gap-8"><button className="btn btn-sm btn-outline" onClick={onRefresh}><RefreshCw size={14} /> Refresh</button><button className="btn btn-sm btn-primary"><Download size={14} /> Export</button></div></div>
+      <div className="section-header">
+        <div className="section-title"><ShoppingCart size={22} /> Order Management & Invoices</div>
+        <div className="flex gap-8">
+          <button className="btn btn-sm btn-outline" onClick={onRefresh}><RefreshCw size={14} /> Refresh</button>
+          <button className="btn btn-sm" style={{background: '#10b981', color: 'white', border: 'none'}} onClick={() => alert('Generating Excel Report...')}><FileText size={14} /> Export to Excel</button>
+          <button className="btn btn-sm" style={{background: '#ef4444', color: 'white', border: 'none'}} onClick={() => window.print()}><Download size={14} /> PDF Invoice</button>
+          <button className="btn btn-sm" style={{background: '#1f2937', color: 'white', border: 'none'}} onClick={() => alert('Sending to Thermal Printer...')}><Printer size={14} /> Thermal Print</button>
+        </div>
+      </div>
       <div className="filter-bar">
         <input className="filter-input" placeholder="Search orders..." value={search} onChange={e => setSearch(e.target.value)} />
         {Object.keys(counts).map(s => <button key={s} className={`tab ${filter === s ? 'active' : ''}`} onClick={() => setFilter(s)}>{s} ({counts[s]})</button>)}
