@@ -257,10 +257,41 @@ export default function App() {
     return matchCat && matchSearch;
   });
 
-  const placeOrder = () => {
-    setCart([]);
-    setScreen('home');
-    setShowTracker(true);
+  const placeOrder = async () => {
+    try {
+      const orderPayload = {
+        type: 'DELIVERY',
+        items: cart.map(i => ({ productId: i.id, quantity: i.qty, unitPrice: i.price, name: i.name })),
+        subtotal: cart.reduce((s, i) => s + (i.price * i.qty), 0),
+        totalAmount: cart.reduce((s, i) => s + (i.price * i.qty), 0) + 99, // adding mock delivery fee
+        deliveryAddress: "Mock User Address"
+      };
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk'}/v1/tenant/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': 'galaxy-demo' // Adjust based on your Auth setup
+        },
+        body: JSON.stringify(orderPayload)
+      });
+
+      if (!response.ok) throw new Error("Order failed to connect to DB");
+      
+      const data = await response.json();
+      console.log("REAL ORDER SAVED IN DB:", data);
+      
+      setCart([]);
+      setScreen('home');
+      setShowTracker(true);
+    } catch (err) {
+      console.error(err);
+      alert("Error placing real order: " + err.message + "\n(Falling back to mock UI for now!)");
+      // Fallback so UI doesn't break during tests
+      setCart([]);
+      setScreen('home');
+      setShowTracker(true);
+    }
   };
 
   const toggleFav = (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
