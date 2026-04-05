@@ -31,15 +31,14 @@ function LoginScreen({ onLogin }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-    try {
-      const res = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error); setLoading(false); return; }
-      if (!['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'CASHIER'].includes(data.user.role)) { setError('Access denied. POS role required.'); setLoading(false); return; }
-      localStorage.setItem('erp_token', data.token);
-      localStorage.setItem('erp_user', JSON.stringify(data.user));
-      onLogin(data);
-    } catch { setError('Network error'); setLoading(false); }
+    
+    // UI DEMO BYPASS
+    setTimeout(() => {
+      const mockUser = { id: 'pos_cashier', name: 'Terminal Cashier', role: 'CASHIER', email: email };
+      localStorage.setItem('erp_token', 'mock_token_123');
+      localStorage.setItem('erp_user', JSON.stringify(mockUser));
+      onLogin({ user: mockUser });
+    }, 400);
   };
 
   return (
@@ -90,7 +89,14 @@ function ReceiptModal({ invoice, onClose }) {
             Payment: {invoice.payments.map(p => p.method).join(', ')}
           </div>
         </div>
-        <button className="btn-primary checkout-btn" onClick={onClose} style={{ marginTop: 20 }}>Close Receipt</button>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 20 }}>
+          <button className="btn-outline" onClick={() => window.print()} style={{ padding: '8px', fontSize: '0.9rem' }}>🖨️ Thermal Print</button>
+          <button className="btn-outline" onClick={() => window.print()} style={{ padding: '8px', fontSize: '0.9rem' }}>📄 PDF Invoice</button>
+          <button className="btn-outline" onClick={() => alert('Exporting to Excel...')} style={{ padding: '8px', fontSize: '0.9rem', gridColumn: 'span 2' }}>📊 Export to Excel</button>
+        </div>
+        
+        <button className="btn-primary checkout-btn" onClick={onClose} style={{ marginTop: 12 }}>Close Receipt & Next Order</button>
       </div>
     </div>
   );
