@@ -1,0 +1,25 @@
+:root {
+  --bg-deep: #000000;
+  --bg-card: #111111;
+  --neon-orange: #f97316;
+  --neon-yellow: #fbbf24;
+  --text-main: #ffffff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; }
+body { background: var(--bg-deep); color: var(--text-main); font-family: 'Inter', sans-serif; overflow: hidden; }
+.kiosk-layout { height: 100vh; display: flex; flex-direction: column; }
+.kiosk-header { height: auto; padding: 40px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); text-align: center; font-size: 3rem; font-weight: 900; }
+.kiosk-content { flex: 1; display: grid; grid-template-columns: 200px 1fr; gap: 40px; padding: 40px; }
+.kiosk-categories { display: flex; flex-direction: column; gap: 20px; }
+.cat-btn { background: var(--bg-card); color: white; border: 2px solid #333; padding: 30px 20px; border-radius: 20px; font-size: 1.5rem; font-weight: bold; cursor: pointer; transition: 0.2s; text-align: left; }
+.cat-btn.active { border-color: var(--neon-orange); background: rgba(249, 115, 22, 0.1); color: var(--neon-orange); }
+.product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; align-content: start; overflow-y: auto; padding-right: 20px; }
+.product-grid::-webkit-scrollbar { width: 0; }
+.product-card { background: var(--bg-card); border-radius: 24px; padding: 30px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 2px solid transparent; transition: 0.3s; }
+.product-card:active { transform: scale(0.95); }
+.product-card img { width: 100%; height: 200px; object-fit: contain; margin-bottom: 20px; filter: drop-shadow(0 10px 15px rgba(249,115,22,0.3)); }
+.product-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 10px; }
+.product-price { font-size: 2rem; color: var(--neon-orange); font-weight: 900; }
+.kiosk-footer { padding: 30px 40px; background: var(--bg-card); border-top: 2px solid #333; display: flex; justify-content: space-between; align-items: center; }
+.btn-checkout { background: var(--neon-orange); color: white; border: none; padding: 25px 60px; font-size: 2rem; font-weight: 900; border-radius: 20px; cursor: pointer; box-shadow: 0 10px 30px rgba(249,115,22,0.4); }
+.cart-total { font-size: 2.5rem; font-weight: 900; }

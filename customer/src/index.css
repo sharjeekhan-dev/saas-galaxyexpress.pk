@@ -1,0 +1,27 @@
+:root {
+  --bg-dark: #09090b;
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --text-main: #f8fafc;
+  --neon-brand: #a855f7;
+  --neon-secondary: #06b6d4;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; touch-action: manipulation; }
+body { background: var(--bg-dark); color: var(--text-main); font-family: 'Outfit', sans-serif; -webkit-tap-highlight-color: transparent; }
+.mobile-app { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 80px; }
+.hero-header { padding: 40px 20px 20px; background: linear-gradient(180deg, rgba(168,85,247,0.2) 0%, transparent 100%); text-align: center; }
+.hero-title { font-size: 2.5rem; font-weight: 800; background: linear-gradient(to right, var(--neon-brand), var(--neon-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; }
+.hero-subtitle { color: #888; font-size: 1rem; }
+.scroll-categories { display: flex; overflow-x: auto; gap: 10px; padding: 0 20px 20px; margin-top: 20px; }
+.scroll-categories::-webkit-scrollbar { display: none; }
+.chip { background: var(--bg-card); color: #ccc; border-radius: 20px; padding: 8px 16px; white-space: nowrap; font-weight: 600; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+.chip.active { background: rgba(168, 85, 247, 0.15); color: var(--neon-brand); border-color: var(--neon-brand); }
+.menu-list { padding: 0 20px; display: flex; flex-direction: column; gap: 15px; }
+.menu-item { background: var(--bg-card); border-radius: 16px; padding: 15px; display: flex; gap: 15px; align-items: center; backdrop-filter: blur(10px); }
+.img-placeholder { width: 80px; height: 80px; background: rgba(0,0,0,0.5); border-radius: 12px; }
+.item-details { flex: 1; }
+.item-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+.item-desc { color: #888; font-size: 0.85rem; line-height: 1.2; margin-bottom: 8px; }
+.item-price { color: var(--neon-brand); font-weight: 800; font-size: 1.1rem; }
+.add-btn { background: var(--neon-brand); color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 1.2rem; font-weight: bold; box-shadow: 0 0 10px rgba(168, 85, 247, 0.4); }
+.add-btn:active { transform: scale(0.9); }
+.floating-cart { position: fixed; bottom: 20px; left: 20px; right: 20px; max-width: 440px; margin: 0 auto; background: var(--neon-brand); color: white; border-radius: 20px; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(168, 85, 247, 0.4); z-index: 50; }
