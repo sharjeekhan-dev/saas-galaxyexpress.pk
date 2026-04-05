@@ -159,7 +159,7 @@ model User {
   
   shifts    Shift[]
   orders    Order[]
-  wallets   Wallet[]
+  wallet    Wallet?
   employee  Employee?
   notifications Notification[] // NEW
   sentMessages Message[] @relation("SentMessages") // NEW
