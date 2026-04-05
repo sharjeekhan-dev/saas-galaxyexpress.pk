@@ -2,9 +2,8 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
-
 COPY prisma ./prisma/
+RUN npm install
 RUN npx prisma generate
 
 COPY . .
