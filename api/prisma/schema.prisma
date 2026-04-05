@@ -612,17 +612,6 @@ model CommissionLedger {
   type        String   @default("PERCENTAGE")
   createdAt   DateTime @default(now())
 }
-
-model DailyClosing {
-  id           String   @id @default(uuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  date         DateTime @default(now())
-  totalRevenue Float
-  notes        String?
-  createdAt    DateTime @default(now())
-}
-
 // =============================================
 // MODULE: CONTENT (Banners, Blog) & API KEYS
 // =============================================
