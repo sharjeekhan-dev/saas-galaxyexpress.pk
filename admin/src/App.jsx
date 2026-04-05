@@ -3,8 +3,8 @@ import gsap from 'gsap';
 import { LayoutDashboard, Users, Building, CreditCard, Settings, LogOut, UserPlus, FileText, Bell, Shield, HelpCircle } from 'lucide-react';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { NotificationAlerts } from '../../shared/useSocket.jsx';
-import { useTranslation } from '../../shared/useTranslation.jsx';
+import { NotificationAlerts } from './shared/useSocket.jsx';
+import { useTranslation } from './shared/useTranslation.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
