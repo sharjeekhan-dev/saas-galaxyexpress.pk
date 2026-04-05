@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { Bike, MapPin, Clock, DollarSign, LogOut, Navigation, Phone, MessageCircle, Send, X } from 'lucide-react';
-import { NotificationAlerts, useSocketEvent } from '../../shared/useSocket.jsx';
-import { useTranslation } from '../../shared/useTranslation.jsx';
+import { NotificationAlerts, useSocketEvent } from './shared/useSocket.jsx';
+import { useTranslation } from './shared/useTranslation.jsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 

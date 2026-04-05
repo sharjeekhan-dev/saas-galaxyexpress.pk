@@ -24,8 +24,38 @@ const io = new Server(server, {
 const prisma = new PrismaClient();
 
 // Middlewares
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    const allowed = process.env.FRONTEND_URLS
+      ? process.env.FRONTEND_URLS.split(',').map(u => u.trim())
+      : [];
+    if (
+      allowed.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('galaxyexpress.pk') ||
+      origin.startsWith('http://localhost')
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  optionsSuccessStatus: 200  // Some browsers (IE11) choke on 204
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight for ALL routes (fixes QUIC/ERR_QUIC_PROTOCOL_ERROR)
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(morgan('dev'));
 

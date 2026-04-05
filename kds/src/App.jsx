@@ -3,6 +3,8 @@ import { io } from 'socket.io-client';
 import gsap from 'gsap';
 import { ChefHat, CheckCircle, Clock } from 'lucide-react';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const mockOrdersInit = [
   {
     id: 'ORD-001',
@@ -42,7 +44,7 @@ function App() {
     );
 
     // Socket Setup
-    const socket = io('http://localhost:5000');
+    const socket = io(API);
     socket.on('connect', () => {
       console.log('KDS Connected to WebSocket');
       socket.emit('join_room', { tenantId: 'DEMO', outletId: 'OUTLET_1' });
