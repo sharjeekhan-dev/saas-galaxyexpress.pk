@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import gsap from 'gsap';
 import { Search, Plus, Minus, Receipt, LogOut } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 const DEMO_PRODUCTS = [
   { id: 'p1', name: 'Neon Burger', category: 'Fast Food', price: 12.99 },
   { id: 'p2', name: 'Cyber Fries', category: 'Fast Food', price: 5.99 },

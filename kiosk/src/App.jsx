@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { Search, ShoppingBag, X, Plus, Minus, Trash2, CreditCard, Banknote, Smartphone, QrCode, ChevronLeft, Clock } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 // ═══════════════════════════════════════
 // PRODUCT DATA (fallback if API unavailable)

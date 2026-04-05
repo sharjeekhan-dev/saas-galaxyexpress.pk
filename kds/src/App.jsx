@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import gsap from 'gsap';
 import { ChefHat, CheckCircle, Clock } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 const mockOrdersInit = [
   {
