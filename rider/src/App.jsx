@@ -4,7 +4,7 @@ import { Bike, MapPin, Clock, DollarSign, LogOut, Navigation, Phone, MessageCirc
 import { NotificationAlerts, useSocketEvent } from './shared/useSocket.jsx';
 import { useTranslation } from './shared/useTranslation.jsx';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 function ChatModal({ onClose, orderId, targetUserId }) {
   const { t } = useTranslation();

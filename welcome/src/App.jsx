@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { Store, ShieldCheck, Truck, CreditCard, BarChart3, Users, ChefHat, MapPin, ExternalLink, Smartphone, Globe, Zap } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 const SERVICES = [
   { icon: <Store size={28}/>, bg: 'linear-gradient(135deg, #06b6d4, #0891b2)', title: 'Multi-Vendor Marketplace', desc: 'Onboard unlimited vendors with verification, commission tracking, and independent dashboards.' },

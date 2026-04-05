@@ -1,5 +1,5 @@
 // Shared API client & auth helpers for all frontend modules
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 class ApiClient {
   constructor() {
