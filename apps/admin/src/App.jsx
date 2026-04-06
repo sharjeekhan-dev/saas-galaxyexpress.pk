@@ -127,11 +127,7 @@ function LoginScreen({ onLogin }) {
       localStorage.setItem('erp_user', JSON.stringify(data.user));
       onLogin(data);
     } catch (err) {
-      // Fallback bypass for demo
-      const mockUser = { id:'admin_1', name:'Master Admin', role:'SUPER_ADMIN', email };
-      localStorage.setItem('erp_token', 'demo.eyJpZCI6ImFkbWluXzEiLCJyb2xlIjoiU1VQRVJfQURNSU4iLCJleHAiOjk5OTk5OTk5OTl9.sig');
-      localStorage.setItem('erp_user', JSON.stringify(mockUser));
-      onLogin({ token:'demo', user: mockUser });
+      setError(err.message || 'Unable to connect to server');
     } finally { setLoading(false); }
   };
 
@@ -398,8 +394,6 @@ export default function App() {
           const notExpired = !payload.exp || payload.exp * 1000 > Date.now();
           if (notExpired) { setUser(JSON.parse(savedUser)); setAuthed(true); return; }
         }
-        // Demo token support
-        if (token.startsWith('demo.')) { setUser(JSON.parse(savedUser)); setAuthed(true); }
       } catch { /* ignore */ }
     }
   }, []);
