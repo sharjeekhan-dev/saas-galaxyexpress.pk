@@ -133,6 +133,35 @@ export default function App() {
     const w = window.open('', '_blank', winProps);
     w.document.write(html);
     w.document.close();
+
+    const orderMeta = posType === 'Delivery' 
+      ? { customer: deliveryCustomer.name, contact: deliveryCustomer.phone, address: deliveryCustomer.address } 
+      : posType === 'Dine-In' 
+      ? { customer: 'Dine-In Guest', table: posCustomer } 
+      : { customer: 'Walk-in Customer' };
+
+    const newOrder = {
+      id: invId,
+      customer: orderMeta.customer,
+      contact: orderMeta.contact || '',
+      table: orderMeta.table || null,
+      address: orderMeta.address || '',
+      items: posCart.map(c => `${c.qty}x ${c.name}`).join(', '),
+      total: grandTotal,
+      status: isSalesReturn ? 'refunded' : 'new',
+      time: new Date().toLocaleTimeString(),
+      source: posType
+    };
+
+    setOrders(prev => [newOrder, ...prev]);
+
+    // Send silently to Backend API
+    fetch(`https://api.galaxyexpress.pk/orders`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ ...newOrder, tenantId: vendor.id })
+    }).catch(e => console.error("Could not post order. Optimistic save applied."));
+
     setPosCart([]);
     setCheckoutModal(false);
     setIsSalesReturn(false);
@@ -246,9 +275,13 @@ export default function App() {
           setOrders(data.orders.map(o => ({
             id: o.id || `ORD-${Math.floor(Math.random() * 10000)}`,
             customer: o.customerInfo?.name || 'Walk-in Customer',
+            contact: o.customerInfo?.phone || '',
+            address: o.customerInfo?.address || '',
+            table: o.tableId || null,
+            source: o.source || 'Takeaway',
             items: Array.isArray(o.items) ? o.items.map(i => `${i.quantity}x ${i.name}`).join(', ') : '',
             total: o.totalAmount || 0,
-            status: o.status === 'PENDING' ? 'new' : (o.status === 'PREPARING' ? 'preparing' : (o.status || '').toLowerCase()),
+            status: (o.status || 'new').toLowerCase(),
             time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString() : 'just now'
           })));
         } else {
@@ -274,7 +307,7 @@ export default function App() {
 
     // Optimistic UI Update
     const originalOrders = [...orders];
-    setOrders(p => p.map(x => x.id === orderId ? { ...x, status: newStatus === 'PREPARING' ? 'preparing' : (newStatus === 'COMPLETED' ? 'completed' : newStatus) } : x));
+    setOrders(p => p.map(x => x.id === orderId ? { ...x, status: newStatus } : x));
 
     try {
       const res = await fetch(`https://api.galaxyexpress.pk/orders/${orderId.replace('ORD-', '')}/status`, {
@@ -690,81 +723,63 @@ export default function App() {
               )}
 
               {/* ORDER PIPELINE */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
-                {/* Pending Column */}
-                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#f97316', marginBottom: 16 }}><Bell size={18} /> New Requests ({orders.filter(o => o.status === 'new').length})</h3>
-                  {orders.filter(o => o.status === 'new').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No new orders</div>}
-                  {orders.filter(o => o.status === 'new').map(o => (
-                    <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : o.source === 'Waiter' ? 'rgba(59,130,246,0.15)' : o.source === 'POS' ? 'rgba(57,255,20,0.1)' : 'rgba(249,115,22,0.15)', color: o.source === 'Kiosk' ? '#8b5cf6' : o.source === 'Waiter' ? '#3b82f6' : o.source === 'POS' ? '#39FF14' : '#f97316' }}>{o.source}</span>}
-                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+              <div style={{ display: 'flex', gap: 20, overflowX: 'auto', paddingBottom: 20 }}>
+                {[
+                  { id: 'new', label: 'New Requests', color: '#f97316', icon: Bell },
+                  { id: 'accepted', label: 'Accepted', color: '#3b82f6', icon: Clock },
+                  { id: 'ready', label: 'Ready', color: '#8b5cf6', icon: CheckCircle },
+                  { id: 'delivered', label: 'Delivered', color: '#16a34a', icon: CheckCircle },
+                  { id: 'cancelled', label: 'Cancelled', color: '#ef4444', icon: X },
+                  { id: 'refunded', label: 'Refunded', color: '#ec4899', icon: RefreshCw }
+                ].map(col => (
+                  <div key={col.id} style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, minWidth: 300, flex: '0 0 auto', opacity: ['cancelled', 'refunded'].includes(col.id) ? 0.7 : 1 }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: col.color, marginBottom: 16 }}>
+                      <col.icon size={18} /> {col.label} ({orders.filter(o => o.status === col.id).length})
+                    </h3>
+                    {orders.filter(o => o.status === col.id).length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders</div>}
+                    {orders.filter(o => o.status === col.id).map(o => (
+                      <div key={o.id} style={{ background: theme.bg, border: `1px solid ${col.color}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontWeight: 900, color: theme.text }}>{o.id}</span>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: theme.bg, border: `1px solid ${col.color}`, color: col.color }}>{o.source || 'Takeaway'}</span>
+                            <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}>
+                          {(o.source === 'Takeaway' || !o.source) && <div><b>Walk-in Customer</b></div>}
+                          {o.source === 'Delivery' && <div><b>{o.customer || 'Delivery Customer'}</b><br/><span style={{fontSize:'0.75rem', color:theme.muted}}>{o.contact} | {o.address}</span></div>}
+                          {o.source === 'Dine-In' && <div><b>Table: {o.table || 'Walk-in'}</b></div>}
+                          {['POS', 'Kiosk', 'Waiter'].includes(o.source) && <div><b>{o.customer}</b></div>}
+                          <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.03)', borderRadius: 6 }}>{o.items}</div>
+                        </div>
+                        <div style={{ fontWeight: 800, color: col.color, marginBottom: 12 }}>Rs {o.total}</div>
+                        
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {col.id === 'new' && (
+                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'accepted')} style={{ flex: 1, padding: 10, background: '#3b82f6', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Accept
+                            </button>
+                          )}
+                          {col.id === 'accepted' && (
+                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'ready')} style={{ flex: 1, padding: 10, background: '#8b5cf6', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Mark Ready
+                            </button>
+                          )}
+                          {col.id === 'ready' && (
+                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'delivered')} style={{ flex: 1, padding: 10, background: '#16a34a', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Deliver
+                            </button>
+                          )}
+                          {['new', 'accepted', 'ready'].includes(col.id) && (
+                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'cancelled')} style={{ padding: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                          )}
+                          <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
                         </div>
                       </div>
-                      <div style={{ marginBottom: 6, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b><br />{o.items}</div>
-                      {o.table && <div style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: 800, marginBottom: 6 }}>🪑 {o.table}</div>}
-                      <div style={{ fontWeight: 800, color: '#39FF14', marginBottom: 12 }}>Rs {o.total}</div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button disabled={processingId === o.id} style={{ flex: 1, padding: 10, background: darkMode ? '#39FF14' : '#0f172a', color: darkMode ? '#000' : 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
-                          onClick={() => updateOrderStatus(o.id, 'PREPARING')}>
-                          {processingId === o.id ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Accept
-                        </button>
-                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Preparing Column */}
-                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#3b82f6', marginBottom: 16 }}><Clock size={18} /> Preparing ({orders.filter(o => o.status === 'preparing').length})</h3>
-                  {orders.filter(o => o.status === 'preparing').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders in prep</div>}
-                  {orders.filter(o => o.status === 'preparing').map(o => (
-                    <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : o.source === 'Waiter' ? 'rgba(59,130,246,0.15)' : 'rgba(57,255,20,0.1)', color: o.source === 'Kiosk' ? '#8b5cf6' : o.source === 'Waiter' ? '#3b82f6' : '#39FF14' }}>{o.source}</span>}
-                          {o.table && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>🪑 {o.table}</span>}
-                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
-                        </div>
-                      </div>
-                      <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b><br />{o.items}</div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button disabled={processingId === o.id} style={{ flex: 1, padding: 10, background: '#3b82f6', color: 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
-                          onClick={() => updateOrderStatus(o.id, 'COMPLETED')}>
-                          {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Mark Ready
-                        </button>
-                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Completed Column */}
-                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20 }}>
-                  <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', marginBottom: 16 }}><CheckCircle size={18} /> Completed ({orders.filter(o => o.status === 'completed').length})</h3>
-                  {orders.filter(o => o.status === 'completed').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No completed orders yet</div>}
-                  {orders.filter(o => o.status === 'completed').map(o => (
-                    <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, opacity: 0.7 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : 'rgba(57,255,20,0.1)', color: o.source === 'Kiosk' ? '#8b5cf6' : '#39FF14' }}>{o.source}</span>}
-                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
-                        </div>
-                      </div>
-                      <div style={{ marginBottom: 6, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b> — {o.items}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 800, color: '#16a34a' }}>Rs {o.total} ✓</span>
-                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '6px 12px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 6, cursor: 'pointer', color: theme.muted, fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}><Printer size={12} /> Reprint</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           )}
