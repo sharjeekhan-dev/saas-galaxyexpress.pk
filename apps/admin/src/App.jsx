@@ -28,6 +28,7 @@ import ProfileModal from './components/ProfileModal.jsx';
 import HRPage from './components/HRPage.jsx';
 import CategoriesPage from './components/CategoriesPage.jsx';
 import OutletsPage from './components/OutletsPage.jsx';
+import GalleryPage from './components/GalleryPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 export const headers = () => ({
@@ -259,7 +260,7 @@ function AdminDashboard({ user, onLogout }) {
       case 'vendors': return <VendorsPage />;
       case 'riders': return <RidersPage />;
       case 'inventory': return <InventoryPage products={data.products} />;
-      case 'reports': return <ReportsPage stats={data.stats} orders={data.orders} />;
+      case 'reports': return <ReportsPage />;
       case 'invoices': return <InvoicesPage />;
       case 'wallets':
       case 'finance': return <WalletsPage />;
@@ -281,26 +282,7 @@ function AdminDashboard({ user, onLogout }) {
       case 'api_keys': return <GenericPage icon={Key} title="API Keys" subtitle="Manage Google, Firebase, Stripe keys" />;
       case 'printers': return <GenericPage icon={Printer} title="Printers" subtitle="Configure thermal and A4 printers" />;
       case 'leads': return <GenericPage icon={UserPlus} title="Lead Management" subtitle="Incoming vendor/tenant leads" />;
-      case 'gallery': return (
-        <div style={{ padding: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 style={{ margin: 0 }}>System-Wide Gallery</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Shared media repository with role-based permissions.</p>
-            </div>
-            <button className="btn btn-primary">+ Upload New Media</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20 }}>
-            {['Folders', 'Categories', 'Products', 'Banners', 'Users', 'Shops', 'Brands'].map(folder => (
-              <div key={folder} className="glass-card" style={{ padding: 30, textAlign: 'center', cursor: 'pointer' }}>
-                <div style={{ fontSize: '3rem', marginBottom: 10 }}>📂</div>
-                <div style={{ fontWeight: 800 }}>{folder}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>45 items</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
+      case 'gallery': return <GalleryPage user={user} />;
       default: return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
     }
   };
@@ -419,16 +401,17 @@ export default function App() {
     if (token && savedUser) {
       try {
         const u = JSON.parse(savedUser);
-        // Force re-validation of role against the latest production baseline
-        if (u.role === 'SUPER_ADMIN' && u.email === 'admin@galaxyexpress.pk') {
-          setUser(u);
-          setAuthed(true);
+        // Strict role validation - only allow pre-verified SUPER_ADMINs
+        if (u && u.role === 'SUPER_ADMIN') {
+           setUser(u);
+           setAuthed(true);
         } else {
-          // Wipe old/insecure sessions
-          localStorage.removeItem('erp_token');
-          localStorage.removeItem('erp_user');
+           localStorage.removeItem('erp_token');
+           localStorage.removeItem('erp_user');
         }
-      } catch { /* ignore */ }
+      } catch { 
+        localStorage.clear();
+      }
     }
   }, []);
 

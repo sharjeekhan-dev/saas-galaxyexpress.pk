@@ -66,8 +66,26 @@ app.use('/uploads', express.static('uploads'));
 app.use((req, res, next) => {
   req.prisma = prisma;
   req.io = io;
+  req.logActivity = async (action, entity, entityId, details) => {
+    try {
+      await prisma.activityLog.create({
+        data: {
+          tenantId: req.user?.tenantId || null,
+          userId: req.user?.id || null,
+          username: req.user?.name || 'System',
+          action,
+          entity,
+          entityId,
+          details: typeof details === 'object' ? JSON.stringify(details) : details,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
+      });
+    } catch (e) { console.error('Logging error:', e); }
+  };
   next();
 });
+
 
 // ============ Load Routes ============
 import authRoutes from './routes/auth.js';
@@ -96,6 +114,9 @@ import chatRoutes from './routes/chat.js';
 import settingsRoutes from './routes/settings.js';
 import printersRoutes from './routes/printers.js';
 import notificationsRoutes from './routes/notifications.js';
+import invoicesRoutes from './routes/invoices.js';
+import backupRoutes from './routes/backup.js';
+
 
 // ============ Register Routes ============
 app.use('/api/auth', authRoutes);
@@ -122,6 +143,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/printers', printersRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/invoices', invoicesRoutes);
+app.use('/api/backup', backupRoutes);
+
 
 // Health check
 app.get('/health', (req, res) => {

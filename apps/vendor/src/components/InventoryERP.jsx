@@ -98,6 +98,9 @@ export default function InventoryERP({ vendor, theme }) {
           <button onClick={() => { setModalType('issuance'); setFormData({ storeId: '', vendorId: vendor.id, departmentId: '', notes: '', lines: [{ productId: '', quantity: 1, rate: 0 }] }); setShowModal(true); }} style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: '#8b5cf6', color: '#fff', cursor: 'pointer', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Truck size={18} /> Stock Issuance
           </button>
+          <button onClick={() => { setModalType('wastage'); setFormData({ storeId: '', vendorId: vendor.id, departmentId: '', notes: '', lines: [{ productId: '', quantity: 1, rate: 0 }] }); setShowModal(true); }} style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Trash2 size={18} /> Log Wastage
+          </button>
         </div>
       </div>
 
@@ -105,6 +108,7 @@ export default function InventoryERP({ vendor, theme }) {
         <button style={tabSty(t('stock'))} onClick={() => setSubTab('stock')}><Package size={16} /> Live Stock Ledger</button>
         <button style={tabSty(t('purchase'))} onClick={() => setSubTab('purchase')}><ShoppingCart size={16} /> Purchase Invoices</button>
         <button style={tabSty(t('issuance'))} onClick={() => setSubTab('issuance')}><Truck size={16} /> Issuances</button>
+        <button style={tabSty(t('wastage'))} onClick={() => setSubTab('wastage')}><Trash2 size={16} /> Wastage</button>
         <button style={tabSty(t('logs'))} onClick={() => setSubTab('logs')}><BarChart3 size={16} /> Audit Trail</button>
       </div>
 

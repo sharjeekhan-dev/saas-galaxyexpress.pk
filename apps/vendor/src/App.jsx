@@ -655,85 +655,70 @@ export default function App() {
                 @keyframes spin { 100% { transform: rotate(360deg); } }
               `}</style>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0 }}>Live Orders Pipeline</h2>
+                <h2 style={{ margin: 0 }}>Live Orders Pipeline (Real-time)</h2>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <div style={{ background: 'rgba(141,224,44,0.1)', color: '#65a30d', padding: '6px 12px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8de02c' }}></div> Accepting Orders
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8de02c' }}></div> System Monitoring Active
                   </div>
+                  <button onClick={fetchOrders} className="btn-icon"><RefreshCw size={16} className={isFetchingOrders ? 'spin' : ''} /></button>
                 </div>
               </div>
 
               {/* ORDER PIPELINE */}
               <div style={{ display: 'flex', gap: 20, overflowX: 'auto', paddingBottom: 20 }}>
                 {[
-                  { id: 'new', label: 'New Requests', color: '#f97316', icon: Bell },
-                  { id: 'accepted', label: 'Accepted', color: '#3b82f6', icon: Clock },
-                  { id: 'ready', label: 'Ready', color: '#8b5cf6', icon: CheckCircle },
-                  { id: 'delivered', label: 'Delivered', color: '#16a34a', icon: CheckCircle },
-                  { id: 'cancelled', label: 'Cancelled', color: '#ef4444', icon: X },
-                  { id: 'refunded', label: 'Refunded', color: '#ec4899', icon: RefreshCw }
+                  { id: 'PENDING', label: 'New Requests', color: '#f97316', icon: Bell },
+                  { id: 'PREPARING', label: 'In Kitchen', color: '#3b82f6', icon: Clock },
+                  { id: 'READY', label: 'Ready', color: '#8b5cf6', icon: CheckCircle },
+                  { id: 'DELIVERED', label: 'Delivered', color: '#16a34a', icon: CheckCircle },
+                  { id: 'CANCELLED', label: 'Cancelled', color: '#ef4444', icon: X }
                 ].map(col => (
-                  <div key={col.id} style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, minWidth: 320, flex: '0 0 auto', opacity: ['cancelled', 'refunded'].includes(col.id) ? 0.7 : 1 }}>
+                  <div key={col.id} style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, minWidth: 320, flex: '0 0 auto' }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: col.color, marginBottom: 16 }}>
                       <col.icon size={18} /> {col.label} ({orders.filter(o => o.status === col.id).length})
                     </h3>
-                    {orders.filter(o => o.status === col.id).length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders</div>}
-                    {orders.filter(o => o.status === col.id).map(o => (
-                      <div key={o.id} style={{ background: theme.bg, border: `1px solid ${col.color}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                             <span style={{ fontWeight: 900, color: theme.text, fontSize: '1.2rem' }}>#GG-{o.id.split('-').pop()}</span>
-                             <span style={{ fontSize: '0.7rem', color: theme.muted, fontWeight: 700 }}>{o.time}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
+                      {orders.filter(o => o.status === col.id).length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '40px 0', border: `1px dashed ${theme.border}`, borderRadius: 12 }}>No {col.label}</div>}
+                      {orders.filter(o => o.status === col.id).map(o => (
+                        <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
+                            <div>
+                               <div style={{ fontWeight: 900, color: theme.text, fontSize: '1.2rem' }}>#{o.orderNumber || o.id.slice(-5)}</div>
+                               <div style={{ fontSize: '0.7rem', color: theme.muted }}>{o.time}</div>
+                            </div>
+                            <span style={{ 
+                               fontSize: '0.65rem', fontWeight: 900, padding: '4px 8px', borderRadius: 6, 
+                               background: o.source === 'DELIVERY' ? 'rgba(249,115,22,0.1)' : (o.source === 'DINE_IN' ? 'rgba(59,130,246,0.1)' : (o.source === 'ONLINE' ? 'rgba(226,27,112,0.1)' : 'rgba(141,224,44,0.1)')), 
+                               color: o.source === 'DELIVERY' ? '#f97316' : (o.source === 'DINE_IN' ? '#3b82f6' : (o.source === 'ONLINE' ? '#e21b70' : '#65a30d')), 
+                               border: `1px solid ${o.source === 'DELIVERY' ? '#f97316' : (o.source === 'DINE_IN' ? '#3b82f6' : (o.source === 'ONLINE' ? '#e21b70' : '#8de02c'))}`
+                            }}>{o.source || 'POS'}</span>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                             <span style={{ 
-                                fontSize: '0.65rem', fontWeight: 900, padding: '4px 10px', borderRadius: 8, 
-                                background: o.source === 'Delivery' ? 'rgba(249,115,22,0.1)' : (o.source === 'Dine-In' ? 'rgba(59,130,246,0.1)' : (o.source === 'Foodpanda' ? 'rgba(226,27,112,0.1)' : 'rgba(141,224,44,0.1)')), 
-                                color: o.source === 'Delivery' ? '#f97316' : (o.source === 'Dine-In' ? '#3b82f6' : (o.source === 'Foodpanda' ? '#e21b70' : '#65a30d')), 
-                                border: `1px solid ${o.source === 'Delivery' ? '#f97316' : (o.source === 'Dine-In' ? '#3b82f6' : (o.source === 'Foodpanda' ? '#e21b70' : '#8de02c'))}`,
-                                textTransform: 'uppercase' 
-                             }}>{o.source || 'Walk-in'}</span>
-                          </div>
-                        </div>
-                        <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}>
-                          {['Foodpanda', 'B2B', 'App'].includes(o.source) && <div><b style={{color: '#e21b70'}}>PLATFORM:</b> <b>{o.customer}</b></div>}
-                          {o.source === 'Delivery' && <div><b style={{color: '#f97316'}}>DELIVERY:</b> <b>{o.customer || 'Customer'}</b><br/><span style={{fontSize:'0.75rem', color:theme.muted, fontWeight:600}}>{o.contact} | {o.address}</span></div>}
-                          {o.source === 'Dine-In' && <div><b style={{color: '#3b82f6'}}>DINE-IN:</b> <b>Table {o.table || 'N/A'}</b></div>}
-                          {(!o.source || o.source === 'Takeaway' || o.source === 'POS' || o.source === 'Kiosk') && <div><b style={{color: '#65a30d'}}>WALK-IN:</b> <b>{o.customer || 'Counter Order'}</b></div>}
                           
-                          <div style={{ marginTop: 10, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 10, borderLeft: `4px solid ${col.color}` }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.75rem', marginBottom: 6, opacity: 0.5 }}>ORDER DETAILS:</div>
-                            <div style={{ fontWeight: 600, lineHeight: 1.4 }}>{o.items}</div>
+                          <div style={{ fontSize: '0.85rem', marginBottom: 12 }}>
+                            <div style={{ fontWeight: 800 }}>{o.customer || 'Guest Customer'}</div>
+                            {o.table && <div style={{ color: '#3b82f6', fontWeight: 700 }}>Table: {o.table}</div>}
+                            <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.1)', borderRadius: 8, borderLeft: `3px solid ${col.color}`, color: theme.muted }}>{o.items}</div>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <span style={{ fontWeight: 900, fontSize: '1.1rem', color: '#8de02c' }}>Rs {o.total}</span>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 6 }}>
+                             {col.id === 'PENDING' && (
+                               <button onClick={() => updateOrderStatus(o.id.replace('ORD-',''), 'PREPARING')} style={{ flex: 1, padding: '8px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Accept</button>
+                             )}
+                             {col.id === 'PREPARING' && (
+                               <button onClick={() => updateOrderStatus(o.id.replace('ORD-',''), 'READY')} style={{ flex: 1, padding: '8px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Ready</button>
+                             )}
+                             {col.id === 'READY' && (
+                               <button onClick={() => updateOrderStatus(o.id.replace('ORD-',''), 'DELIVERED')} style={{ flex: 1, padding: '8px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Deliver</button>
+                             )}
+                             <button onClick={() => showToast('Printing invoice...')} style={{ padding: '8px', background: theme.card, border: `1px solid ${theme.border}`, color: theme.text, borderRadius: 8, cursor: 'pointer' }}><Printer size={14}/></button>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: col.color }}>Rs {o.total}</span>
-                          <span style={{ fontSize: '0.7rem', color: theme.muted, fontWeight: 700 }}>ID: {o.id}</span>
-                        </div>
-                        
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {col.id === 'new' && (
-                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'accepted')} style={{ flex: 1, padding: 10, background: '#3b82f6', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Accept
-                            </button>
-                          )}
-                          {col.id === 'accepted' && (
-                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'ready')} style={{ flex: 1, padding: 10, background: '#8b5cf6', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Mark Ready
-                            </button>
-                          )}
-                          {col.id === 'ready' && (
-                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'delivered')} style={{ flex: 1, padding: 10, background: '#16a34a', color: 'white', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-                              {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Deliver
-                            </button>
-                          )}
-                          {['new', 'accepted', 'ready'].includes(col.id) && (
-                            <button disabled={processingId === o.id} onClick={() => updateOrderStatus(o.id, 'cancelled')} style={{ padding: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-                          )}
-                          <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

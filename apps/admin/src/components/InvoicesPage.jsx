@@ -55,9 +55,8 @@ function buildPrintHTML(inv, mode) {
         <div>NTN: 8234791-2</div>
         <div>Tel: +92-300-1234567</div>
         <div class="divider"></div>
-        <div>Receipt #: ${inv.renamedTo||inv.id}</div>
-        <div>Date: ${inv.issued}</div>
-        <div>Customer: ${inv.client}</div>
+        <div>Receipt #: ${inv.orderNumber || inv.invoiceNumber}</div>
+        <div>Date: ${new Date(inv.createdAt).toLocaleDateString()}</div>
       </div>
       <div class="divider"></div>
       <table>

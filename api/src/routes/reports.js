@@ -113,4 +113,88 @@ router.get('/riders', requireAuth, requireTenant, async (req, res) => {
   }
 });
 
+// GET /api/reports/purchases — purchase summary
+router.get('/purchases', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const invoices = await req.prisma.purchaseInvoice.findMany({
+      where: { tenantId: req.user.tenantId, status: 'APPROVED' },
+      include: { vendor: true, store: true, lines: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    const totalPurchases = invoices.reduce((s, i) => s + i.netAmount, 0);
+    res.json({ totalPurchases, invoices });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/reports/issuances — store to department issuances
+router.get('/issuances', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const issuances = await req.prisma.stockIssuance.findMany({
+      where: { tenantId: req.user.tenantId, status: 'APPROVED' },
+      include: { store: true, department: true, lines: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(issuances);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/reports/wastage — wastage & variance
+router.get('/wastage', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const wastages = await req.prisma.wastage.findMany({
+      where: { tenantId: req.user.tenantId, status: 'APPROVED' },
+      include: { lines: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(wastages);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/reports/dashboard — aggregate stats for dashboard
+router.get('/dashboard', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const [orders, users, products, tenants] = await Promise.all([
+      req.prisma.order.findMany({ where: { tenantId }, include: { payments: true } }),
+      req.prisma.user.count({ where: { tenantId } }),
+      req.prisma.product.count({ where: { tenantId } }),
+      req.prisma.tenant.count() // Super Admin view logic should be handled here
+    ]);
+
+    const totalRevenue = orders.reduce((s, o) => s + o.totalAmount, 0);
+    const totalOrders = orders.length;
+
+    // Monthly revenue trend (last 12 months)
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const revenueTrend = months.map(m => 0); // Placeholder for group-by logic
+    
+    // Simplified daily/monthly aggregation
+    const monthlyMap = {};
+    orders.forEach(o => {
+      const m = o.createdAt.getMonth();
+      revenueTrend[m] += o.totalAmount;
+    });
+
+    res.json({
+      totalRevenue, totalOrders, totalUsers: users, totalProducts: products, totalTenants: tenants,
+      revenueTrend,
+      recentOrders: orders.slice(0, 10)
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// GET /api/reports/activity-logs — platform audit
+router.get('/activity-logs', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const logs = await req.prisma.activityLog.findMany({
+      where: { tenantId: req.user.tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(logs);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 export default router;
+
+

@@ -118,6 +118,10 @@ model Tenant {
   printers        Printer[]          // NEW
   translations    Translation[]      // NEW
   faqs            Faq[]              // NEW
+  activityLogs    ActivityLog[]
+  wastageEntries  WastageLog[] @relation("TenantWastage")
+  wastages        Wastage[]
+
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -168,6 +172,8 @@ model User {
   notifications Notification[] // NEW
   sentMessages Message[] @relation("SentMessages") // NEW
   mediaFiles   Media[] // NEW: User's uploaded media
+  activityLogs ActivityLog[]
+
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1058,3 +1064,43 @@ model InventoryAuditTrail {
   createdAt       DateTime @default(now())
 }
 
+model ActivityLog {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  username        String?
+  action          String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT
+  entity          String   // User, Product, Category, Invoice, etc.
+  entityId        String?
+  details         String?  // JSON string or description
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+}
+
+model Wastage {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  locationId      String   // Store or Department
+  locationType    String   // STORE or DEPARTMENT
+  reason          String   // EXPIRED, DAMAGED, THEFT, SPOILAGE
+  notes           String?
+  status          InventoryTxStatus @default(PENDING)
+  approvedBy      String?
+  
+  lines           WastageLine[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model WastageLine {
+  id              String   @id @default(uuid())
+  wastageId       String
+  wastage         Wastage  @relation(fields: [wastageId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Float
+}
