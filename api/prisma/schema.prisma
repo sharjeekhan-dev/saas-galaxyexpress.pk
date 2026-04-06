@@ -119,9 +119,16 @@ model Tenant {
   translations    Translation[]      // NEW
   faqs            Faq[]              // NEW
   activityLogs    ActivityLog[]
-  wastageEntries  WastageLog[] @relation("TenantWastage")
   wastages        Wastage[]
+  purchaseInvoices PurchaseInvoice[]
+  stockIssuances   StockIssuance[]
+  stockReceivings  StockReceiving[]
+  stockAdjustments StockAdjustment[]
+  inventoryAudits  InventoryAuditTrail[]
+  media            Media[]
 
+  
+  systemLogs       SystemLog[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -790,7 +797,9 @@ model Feedback {
 model SystemLog {
   id        String   @id @default(uuid())
   tenantId  String?
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
   userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
   action    String
   entity    String?  
   entityId  String?
@@ -1050,6 +1059,7 @@ model StockAdjustmentLine {
 model InventoryAuditTrail {
   id              String   @id @default(uuid())
   tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
   userId          String
   username        String
   actionType      String   // PURCHASE, ISSUANCE, RECEIVING, ADJUSTMENT
