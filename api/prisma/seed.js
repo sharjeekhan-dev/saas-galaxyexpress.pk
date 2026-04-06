@@ -27,7 +27,7 @@ async function main() {
   // 2. Create users for every role
   const password = await bcrypt.hash('GalaxyAdmin123!', 12);
 
-  const adminEmail = 'super@galaxyexpress.pk';
+  const adminEmail = 'admin@galaxyexpress.pk';
   const superAdmin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: { isActive: true, status: 'APPROVED' },

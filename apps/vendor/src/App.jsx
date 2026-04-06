@@ -7,6 +7,8 @@ import {
 import MasterConfiguration from './components/MasterConfiguration.jsx';
 import LoginPage from '../../../shared/LoginPage.jsx';
 
+export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
+
 export default function App() {
   const [vendor, setVendor] = useState(() => {
     const saved = localStorage.getItem('vendor_auth');
@@ -159,7 +161,7 @@ export default function App() {
     setOrders(prev => [newOrder, ...prev]);
 
     // Send silently to Backend API
-    fetch(`https://api.galaxyexpress.pk/orders`, {
+    fetch(`${API}/orders`, {
        method: 'POST',
        headers: { 'Content-Type': 'application/json' },
        body: JSON.stringify({ ...newOrder, tenantId: vendor.id })
@@ -227,7 +229,7 @@ export default function App() {
   const fetchTablesData = async () => {
     if (!vendor) return;
     try {
-      const res = await fetch(`https://api.galaxyexpress.pk/api/tables?tenantId=${vendor.id}`);
+      const res = await fetch(`${API}/api/tables?tenantId=${vendor.id}`);
       if (res.ok) {
         const data = await res.json();
         setTables((Array.isArray(data) ? data : []).map(t => ({
@@ -267,7 +269,7 @@ export default function App() {
     if (!vendor) return;
     setIsFetchingOrders(true);
     try {
-      const res = await fetch(`https://api.galaxyexpress.pk/orders?tenantId=${vendor.id || 'default'}`);
+      const res = await fetch(`${API}/orders?tenantId=${vendor.id || 'default'}`);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.orders)) {
@@ -309,7 +311,7 @@ export default function App() {
     setOrders(p => p.map(x => x.id === orderId ? { ...x, status: newStatus } : x));
 
     try {
-      const res = await fetch(`https://api.galaxyexpress.pk/orders/${orderId.replace('ORD-', '')}/status`, {
+      const res = await fetch(`${API}/orders/${orderId.replace('ORD-', '')}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, tenantId: vendor.id })
@@ -335,7 +337,7 @@ export default function App() {
     if (!vendor) return;
     setIsFetchingProducts(true);
     try {
-      const res = await fetch(`https://api.galaxyexpress.pk/products?tenantId=${vendor.id}`);
+      const res = await fetch(`${API}/products?tenantId=${vendor.id}`);
       if (res.ok) {
         const data = await res.json();
         setProducts(Array.isArray(data) ? data : (data.products || []));
@@ -356,7 +358,7 @@ export default function App() {
     setProducts(products.filter(p => p.id !== id));
     showToast('Product deleted from view (Optimistic update)');
     try {
-      await fetch(`https://api.galaxyexpress.pk/products/${id}?tenantId=${vendor.id}`, { method: 'DELETE' });
+      await fetch(`${API}/products/${id}?tenantId=${vendor.id}`, { method: 'DELETE' });
     } catch (e) {
       showToast('API issue, but UI handled optimistically');
     }
@@ -385,7 +387,7 @@ export default function App() {
     }
 
     try {
-      await fetch(`https://api.galaxyexpress.pk/products${productModal.mode === 'edit' ? `/${newProd.id}` : ''}`, {
+      await fetch(`${API}/products${productModal.mode === 'edit' ? `/${newProd.id}` : ''}`, {
         method: productModal.mode === 'add' ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newProd, tenantId: vendor.id })
@@ -628,15 +630,7 @@ export default function App() {
             </h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <select value={currentUser.id} onChange={(e) => {
-              const u = staffUsers.find(x => x.id == e.target.value);
-              setCurrentUser(u);
-              if (!u.permissions.includes('ALL') && !u.permissions.includes(activeTab) && activeTab !== 'pos') {
-                setActiveTab(u.permissions.filter(p => !['ALL', 'sales_return'].includes(p))[0] || 'pos');
-              }
-            }} style={{ padding: '8px 12px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, fontWeight: 800, outline: 'none' }}>
-              {staffUsers.map(u => <option key={u.id} value={u.id}>Log in as {u.name} ({u.role})</option>)}
-            </select>
+            {/* INSECURE USER SWITCHER REMOVED */}
             <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: theme.text }}>
               {darkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>
@@ -1776,21 +1770,30 @@ export default function App() {
           {activeTab === 'gallery' && (
             <div style={{ animation: 'fadeIn 0.4s' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0 }}>Media Gallery</h2>
+                <div>
+                  <h2 style={{ margin: 0 }}>Centralized Media Gallery</h2>
+                  <p style={{ color: theme.muted, fontSize: '0.85rem', marginTop: 4 }}>
+                    {currentUser?.role === 'SUPER_ADMIN' ? 'System-wide asset management' : 'Authorized media assets for your tenant'}
+                  </p>
+                </div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  {['All', 'Restaurant', 'Shops', 'Categories', 'Banners', 'Coupons'].map(cat => (
-                    <button key={cat} onClick={()=>setReportTab(cat.toLowerCase())} style={{ padding: '8px 16px', borderRadius: 10, border: `1px solid ${theme.border}`, background: reportTab === cat.toLowerCase() ? '#39FF14' : 'transparent', color: reportTab === cat.toLowerCase() ? '#000' : theme.text, fontWeight: 700, cursor: 'pointer' }}>{cat}</button>
-                  ))}
+                  <button className="btn" style={{ ...actBtn, background: '#39FF14', color: '#000' }}><Plus size={16} /> Upload Media</button>
                 </div>
               </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20 }}>
-                {/* Visualizing folders like the screenshot */}
-                {['Restaurant', 'Shops', 'Deliveryman', 'Banners', 'Brands', 'Blogs', 'Categories', 'Coupons', 'Discounts'].map(folder => (
-                  <div key={folder} style={{ background: theme.card, borderRadius: 20, padding: 24, border: `1px solid ${theme.border}`, textAlign: 'center', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
-                    <div style={{ fontSize: '4rem', marginBottom: 12 }}>📁</div>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{folder}</div>
-                    <div style={{ fontSize: '0.75rem', color: theme.muted, marginTop: 4 }}>124 Items</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 24 }}>
+                {(currentUser?.role === 'SUPER_ADMIN' 
+                  ? ['Restaurant', 'Shops', 'Deliveryman', 'Banners', 'Brands', 'Blogs', 'Categories', 'Coupons', 'Products'] 
+                  : ['Categories', 'Products']
+                ).map(folder => (
+                  <div key={folder} style={{ 
+                    background: theme.card, borderRadius: 24, padding: 32, border: `1px solid ${theme.border}`, 
+                    textAlign: 'center', cursor: 'pointer', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                  }} onMouseOver={e=>{e.currentTarget.style.transform='translateY(-8px)'; e.currentTarget.style.borderColor='#39FF14';}} onMouseOut={e=>{e.currentTarget.style.transform='none'; e.currentTarget.style.borderColor=theme.border;}}>
+                    <div style={{ fontSize: '4.5rem', marginBottom: 16 }}>📂</div>
+                    <div style={{ fontWeight: 900, fontSize: '1.2rem', color: theme.text }}>{folder}</div>
+                    <div style={{ fontSize: '0.8rem', color: theme.muted, marginTop: 6, fontWeight: 600 }}>124 Items · 850 MB</div>
                   </div>
                 ))}
               </div>
@@ -1798,7 +1801,7 @@ export default function App() {
           )}
 
           {activeTab === 'settings' && (
-            <MasterConfiguration theme={theme} darkMode={darkMode} showToast={showToast} API="https://api.galaxyexpress.pk" vendor={vendor} />
+            <MasterConfiguration theme={theme} darkMode={darkMode} showToast={showToast} API={API} vendor={vendor} />
           )}
 
         </div>

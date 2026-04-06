@@ -107,23 +107,31 @@ function GenericPage({ icon: Icon, title, subtitle }) {
 }
 
 // ─── LOGIN ──────────────────────────────────────────────────────────────────
+// ─── LOGIN ──────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState('admin@platform.com');
-  const [password, setPassword] = useState('Admin1234!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState('email');
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); setError(''); setLoading(true);
+    e.preventDefault(); 
+    if (!email || !password) return setError('Credentials required');
+    setError(''); 
+    setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email.trim(), password })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
+      
+      if (data.user.role !== 'SUPER_ADMIN') {
+        throw new Error('Unauthorized role for Admin Panel');
+      }
+
       localStorage.setItem('erp_token', data.token);
       localStorage.setItem('erp_user', JSON.stringify(data.user));
       onLogin(data);
@@ -133,60 +141,60 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-brand">
-          <div className="login-brand-icon">⚡</div>
-          <h1>GalaxyERP</h1>
-          <p>Super Admin Dashboard</p>
+    <div className="login-page" style={{ 
+      background: 'radial-gradient(circle at top left, #1e1b4b, #000000)',
+      height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center'
+    }}>
+      <div className="login-container glass-card" style={{ 
+        width: 400, padding: 40, borderRadius: 24, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(2, 8, 23, 0.7)', backdropFilter: 'blur(12px)'
+      }}>
+        <div className="login-brand" style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div className="login-brand-icon" style={{ 
+            fontSize: '3rem', marginBottom: 12, 
+            background: 'linear-gradient(45deg, #39FF14, #8de02c)', 
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+          }}>⚡</div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>GalaxyERP</h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: '0.9rem' }}>Enterprise Super Admin Dashboard</p>
         </div>
 
-        <div className="tabs mb-20" style={{justifyContent:'center'}}>
-          {['email','google','whatsapp'].map(t => (
-            <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>
-              {t==='email'?'Email':t==='google'?'Google':'WhatsApp'}
-            </button>
-          ))}
-        </div>
+        {error && <div className="login-error" style={{ 
+          padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', 
+          borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: 24,
+          fontSize: '0.85rem', fontWeight: 600, textAlign: 'center'
+        }}>{error}</div>}
 
-        {error && <div className="login-error">{error}</div>}
-
-        {tab==='email' && (
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Email Address</label>
-              <input className="form-input" type="email" placeholder="admin@platform.com"
-                value={email} onChange={e => setEmail(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label>Password</label>
-              <input className="form-input" type="password" placeholder="••••••••"
-                value={password} onChange={e => setPassword(e.target.value)} required />
-            </div>
-            <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? 'Signing in…' : 'Sign In →'}
-            </button>
-          </form>
-        )}
-
-        {tab==='google' && (
-          <button className="login-btn" style={{marginTop:0}} onClick={handleSubmit}>
-            🔵 Continue with Google
+        <form className="login-form" onSubmit={handleSubmit}>
+          <div className="form-group" style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Email Address</label>
+            <input className="form-input" type="email" placeholder="admin@galaxyexpress.pk"
+              style={{ 
+                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', 
+                border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.95rem'
+              }}
+              value={email} onChange={e => setEmail(e.target.value)} required />
+          </div>
+          <div className="form-group" style={{ marginBottom: 32 }}>
+            <label style={{ display: 'block', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Password</label>
+            <input className="form-input" type="password" placeholder="••••••••"
+              style={{ 
+                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', 
+                border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.95rem'
+              }}
+              value={password} onChange={e => setPassword(e.target.value)} required />
+          </div>
+          <button type="submit" className="login-btn" disabled={loading} style={{
+            width: '100%', padding: '16px', borderRadius: 15, background: 'linear-gradient(45deg, #39FF14, #8de02c)',
+            color: '#000', fontWeight: 900, border: 'none', cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 8px 16px -4px rgba(57, 255, 20, 0.4)', fontSize: '1rem'
+          }}>
+            {loading ? 'Authenticating…' : 'Sign In To System →'}
           </button>
-        )}
+        </form>
 
-        {tab==='whatsapp' && (
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>WhatsApp Number</label>
-              <input className="form-input" type="tel" placeholder="+92 300 0000000" />
-            </div>
-            <button type="submit" className="login-btn">Send OTP via WhatsApp</button>
-          </form>
-        )}
-
-        <div className="login-footer">
-          Powered by <a href="#">GalaxyExpress Platform</a> · ERP v3.0
+        <div className="login-footer" style={{ textAlign: 'center', marginTop: 40, color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
+          Restricted Access · GalaxyERP v3.0 Production
         </div>
       </div>
     </div>
