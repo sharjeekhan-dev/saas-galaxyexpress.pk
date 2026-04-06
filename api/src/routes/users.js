@@ -14,7 +14,7 @@ router.get('/', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_
     }
     const users = await req.prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true, role: true, tenantId: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, tenantId: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(users);
@@ -41,12 +41,15 @@ router.post('/', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT
       return res.status(403).json({ error: 'Only Super Admins can create Super Admins' });
     }
     const hashedPassword = await bcrypt.hash(password, 12);
+    
+    // Vendor creation results in PENDING status
+    const status = req.user.role === 'SUPER_ADMIN' ? 'APPROVED' : 'PENDING';
 
     const user = await req.prisma.user.create({
-      data: { name, email, password: hashedPassword, role, tenantId: req.user.tenantId }
+      data: { name, email, password: hashedPassword, role, tenantId: req.user.tenantId, status }
     });
 
-    res.status(201).json({ id: user.id, name: user.name, email: user.email, role: user.role });
+    res.status(201).json({ id: user.id, name: user.name, email: user.email, role: user.role, status: user.status });
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Email already exists' });
     res.status(500).json({ error: err.message });
@@ -62,6 +65,19 @@ router.put('/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENA
       data: { name, role }
     });
     res.json({ id: user.id, name: user.name, role: user.role });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/users/:id/approve — approve a pending user
+router.patch('/:id/approve', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const user = await req.prisma.user.update({
+      where: { id: req.params.id },
+      data: { status: 'APPROVED', isActive: true }
+    });
+    res.json({ message: 'User approved', user: { id: user.id, name: user.name, status: user.status } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

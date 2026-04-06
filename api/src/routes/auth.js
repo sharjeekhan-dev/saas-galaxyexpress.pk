@@ -28,6 +28,8 @@ router.post('/login', async (req, res) => {
     const { email, password } = parsed.data;
     const user = await req.prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    if (user.status === 'PENDING') return res.status(403).json({ error: 'Your account is pending approval from the Super Admin.' });
+    if (user.status === 'REJECTED') return res.status(403).json({ error: 'Your account request was rejected.' });
     if (!user.isActive) return res.status(403).json({ error: 'Account is deactivated' });
 
     const isValid = await bcrypt.compare(password, user.password);
@@ -62,8 +64,10 @@ router.post('/register', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    const status = (role === 'CUSTOMER' || !role) ? 'APPROVED' : 'PENDING';
+
     const user = await req.prisma.user.create({
-      data: { name, email, phone, password: hashedPassword, role: role || 'CUSTOMER', tenantId: tenantId || null }
+      data: { name, email, phone, password: hashedPassword, role: role || 'CUSTOMER', tenantId: tenantId || null, status }
     });
 
     // Auto-create wallet for customers

@@ -89,6 +89,7 @@ import hrRoutes from './routes/hr.js';
 import contentRoutes from './routes/content.js';
 import apikeysRoutes from './routes/apikeys.js';
 import dailyclosingRoutes from './routes/dailyclosing.js';
+import galleryRoutes from './routes/gallery.js';
 
 // Phase 2 Routes
 import chatRoutes from './routes/chat.js';
@@ -116,6 +117,7 @@ app.use('/api/hr', hrRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/apikeys', apikeysRoutes);
 app.use('/api/daily-closing', dailyclosingRoutes);
+app.use('/api/gallery', galleryRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/printers', printersRoutes);

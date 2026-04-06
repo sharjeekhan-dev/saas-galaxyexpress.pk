@@ -411,17 +411,23 @@ function UsersTab({ theme, showToast, API, vendor }) {
             <th style={{ padding: '14px 16px', fontWeight: 700 }}>Provider Name</th>
             <th style={{ padding: '14px 16px', fontWeight: 700 }}>Email ID</th>
             <th style={{ padding: '14px 16px', fontWeight: 700 }}>Role</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Status</th>
             <th style={{ padding: '14px 16px', fontWeight: 700, width: 100 }}>Actions</th>
           </tr>
         </thead>
-        <tbody>
-          {users.length === 0 && <tr><td colSpan={4} style={{ textAlign:'center', padding: 30, color: theme.muted }}>No extra users bound to this tenant.</td></tr>}
+        <tbody style={{ fontSize: '0.9rem' }}>
+          {users.length === 0 && <tr><td colSpan={5} style={{ textAlign:'center', padding: 30, color: theme.muted }}>No extra users bound to this tenant.</td></tr>}
           {users.map(u => (
             <tr key={u.id} style={{ borderTop: `1px solid ${theme.border}` }}>
               <td style={{ padding: '14px 16px', fontWeight: 700, color: theme.text }}>{u.name}</td>
               <td style={{ padding: '14px 16px', color: theme.muted }}>{u.email}</td>
               <td style={{ padding: '14px 16px', color: theme.muted }}>
-                <span style={{ padding: '4px 8px', background: 'rgba(57,255,20,0.1)', color: '#39FF14', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 }}>{u.role}</span>
+                <span style={{ padding: '4px 8px', background: 'rgba(57,255,20,0.1)', color: '#39FF14', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 }}>{u.role.replace('_',' ')}</span>
+              </td>
+              <td style={{ padding: '14px 16px' }}>
+                <span style={{ padding: '4px 10px', background: u.status === 'PENDING' ? 'rgba(249,115,22,0.15)' : 'rgba(22,163,74,0.15)', color: u.status === 'PENDING' ? '#f97316' : '#16a34a', borderRadius: 20, fontSize: '0.7rem', fontWeight: 800 }}>
+                  {u.status || 'APPROVED'}
+                </span>
               </td>
               <td style={{ padding: '14px 16px' }}>
                 <button onClick={() => handleDelete(u.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
@@ -430,6 +436,9 @@ function UsersTab({ theme, showToast, API, vendor }) {
           ))}
         </tbody>
       </table>
+      <div style={{ marginTop: 20, padding: 16, background: 'rgba(0,0,0,0.05)', borderRadius: 12, border: `1px dashed ${theme.border}`, fontSize: '0.8rem', color: theme.muted }}>
+        <b>Note:</b> New staff added locally are set to <b>PENDING</b>. They must be approved by the Super Admin to gain system access.
+      </div>
     </div>
   );
 }

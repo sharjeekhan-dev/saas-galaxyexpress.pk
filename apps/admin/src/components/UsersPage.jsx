@@ -58,6 +58,13 @@ export default function UsersPage({ users, onRefresh }) {
     try { await fetch(`${API}/api/users/${id}`, { method:'DELETE', headers:headers() }); onRefresh(); } catch {}
   };
 
+  const approveUser = async (id) => {
+    try { 
+      const res = await fetch(`${API}/api/users/${id}/approve`, { method:'PATCH', headers:headers() }); 
+      if (res.ok) onRefresh();
+    } catch {}
+  };
+
   return (
     <div className="fade-in">
       {showModal && (
@@ -134,10 +141,17 @@ export default function UsersPage({ users, onRefresh }) {
                 <td style={{fontWeight:700}}>{u.name}</td>
                 <td className="text-muted text-sm">{u.email}</td>
                 <td><span className={`badge ${ROLE_COLOR[u.role]||'badge-default'}`}>{u.role?.replace('_',' ')}</span></td>
-                <td><span className={`badge ${u.isActive!==false?'badge-success':'badge-danger'}`}>{u.isActive!==false?'Active':'Inactive'}</span></td>
+                <td>
+                  <span className={`badge ${u.status === 'PENDING' ? 'badge-orange' : (u.isActive !== false ? 'badge-success' : 'badge-danger')}`}>
+                    {u.status || (u.isActive !== false ? 'Active' : 'Inactive')}
+                  </span>
+                </td>
                 <td className="text-muted text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td>
                   <div className="flex gap-4">
+                    {u.status === 'PENDING' && (
+                       <button className="btn btn-primary btn-xs" style={{padding:'2px 8px'}} onClick={()=>approveUser(u.id)}>Approve</button>
+                    )}
                     <button className="btn-icon" title="Edit"><Edit size={13}/></button>
                     <button className="btn-icon" title="Remove" onClick={()=>deleteUser(u.id)}><Trash2 size={13}/></button>
                   </div>

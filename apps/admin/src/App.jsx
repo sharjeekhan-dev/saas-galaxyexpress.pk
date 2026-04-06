@@ -64,6 +64,7 @@ const NAV = [
   { section: 'Marketing' },
   { id: 'coupons',      label: 'Coupons',          icon: Tag },
   { id: 'banners',      label: 'Banners',          icon: Image },
+  { id: 'gallery',      label: 'Media Gallery',    icon: Image, badge: 'New' },
   { id: 'notifications', label: 'Notifications',  icon: Bell },
   { section: 'Content' },
   { id: 'blog',         label: 'Blog / CMS',       icon: BookOpen },
@@ -85,7 +86,7 @@ const PAGE_TITLES = {
   finance:'Payments & Payouts', commissions:'Commissions', wallets:'Wallets & Ledger',
   b2b:'B2B Portal', hr:'HR & Staff', coupons:'Coupons', banners:'Banners',
   notifications:'Notifications', blog:'Blog / CMS', faqs:'FAQs',
-  tenants:'Tenant Management', leads:'Leads',
+  tenants:'Tenant Management', leads:'Leads', gallery:'Media Gallery (Cloud)',
   settings:'Settings', api_keys:'API Keys', printers:'Printers',
 };
 
@@ -270,6 +271,26 @@ function AdminDashboard({ user, onLogout }) {
       case 'api_keys':    return <GenericPage icon={Key} title="API Keys" subtitle="Manage Google, Firebase, Stripe keys" />;
       case 'printers':    return <GenericPage icon={Printer} title="Printers" subtitle="Configure thermal and A4 printers" />;
       case 'leads':       return <GenericPage icon={UserPlus} title="Lead Management" subtitle="Incoming vendor/tenant leads" />;
+      case 'gallery':     return (
+        <div style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h2 style={{ margin: 0 }}>System-Wide Gallery</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Shared media repository with role-based permissions.</p>
+            </div>
+            <button className="btn btn-primary">+ Upload New Media</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20 }}>
+            {['Folders', 'Categories', 'Products', 'Banners', 'Users', 'Shops', 'Brands'].map(folder => (
+              <div key={folder} className="glass-card" style={{ padding: 30, textAlign: 'center', cursor: 'pointer' }}>
+                <div style={{ fontSize: '3rem', marginBottom: 10 }}>📂</div>
+                <div style={{ fontWeight: 800 }}>{folder}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>45 items</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
       default:            return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
     }
   };

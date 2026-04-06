@@ -148,6 +148,7 @@ model User {
   fcmToken  String?  // NEW: Firebase Cloud Messaging token for pushes
   role      Role
   isActive  Boolean  @default(true)
+  status    String   @default("APPROVED") // PENDING, APPROVED, REJECTED
   otpCode   String?
   otpExpiry DateTime?
   darkMode  Boolean  @default(true)
@@ -166,6 +167,7 @@ model User {
   employee  Employee?
   notifications Notification[] // NEW
   sentMessages Message[] @relation("SentMessages") // NEW
+  mediaFiles   Media[] // NEW: User's uploaded media
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -886,5 +888,18 @@ model Notification {
   link        String?  // Deep link or relative path
   isRead      Boolean  @default(false)
   
+  createdAt   DateTime @default(now())
+}
+
+model Media {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  url         String
+  category    String?  // Folder like "Restaurant", "Shops", "Categories", etc.
+  type        String   @default("IMAGE") // IMAGE, VIDEO
+  isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
 }

@@ -14,7 +14,7 @@ export default function App() {
   }); // { name: 'Pizza Palace', id: 'V-001', ... }
 
   const [activeTab, setActiveTab] = useState('orders');
-  const [reportTab, setReportTab] = useState('overview');
+  const [reportTab, setReportTab] = useState('gallery'); // For gallery folders
   const [mobileMenu, setMobileMenu] = useState(false);
   const [previewMode, setPreviewMode] = useState(null);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('vendor_dark') !== 'false'); // Default dark
@@ -24,23 +24,26 @@ export default function App() {
   const [processingId, setProcessingId] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
 
-  // --- Staff & RBAC ---
-  const [staffUsers, setStaffUsers] = useState([
-    { id: 1, name: 'Vendor Admin (Owner)', role: 'Vendor Admin', permissions: ['ALL'] },
-    { id: 2, name: 'Cashier Ali', role: 'Cashier', permissions: ['pos', 'orders'] },
-    { id: 3, name: 'Chef Zeeshan', role: 'Kitchen', permissions: ['inventory', 'orders'] }
-  ]);
-  const [currentUser, setCurrentUser] = useState(staffUsers[0]);
-  const hasPerm = (p) => currentUser.permissions.includes('ALL') || currentUser.permissions.includes(p);
+  // --- Authentic User State ---
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedUser = localStorage.getItem('erp_user');
+    if (savedUser) {
+      const u = JSON.parse(savedUser);
+      return { 
+        id: u.id, 
+        name: u.name, 
+        role: u.role, 
+        permissions: ['SUPER_ADMIN', 'VENDOR_ADMIN'].includes(u.role) ? ['ALL'] : ['pos', 'orders']
+      };
+    }
+    return null;
+  });
+  const hasPerm = (p) => currentUser?.permissions?.includes('ALL') || currentUser?.permissions?.includes(p);
 
   // Chat State
   const [activeChat, setActiveChat] = useState('c-1');
   const [chatInput, setChatInput] = useState('');
-  const [conversations, setConversations] = useState([
-    { id: 'c-1', participant: 'Ali R.', type: 'Customer', order: 'ORD-1021', avatar: 'A', unread: 2, messages: [{ id: 1, sender: 'customer', text: 'Where is my order?', time: '2 mins ago' }, { id: 2, sender: 'vendor', text: 'It is being prepared, leaving in 5 mins!', time: '1 min ago' }, { id: 3, sender: 'customer', text: 'Thank you!', time: 'Just now' }] },
-    { id: 'c-2', participant: 'Rider Zeeshan', type: 'Rider', order: 'ORD-1020', avatar: 'Z', unread: 0, messages: [{ id: 1, sender: 'rider', text: 'I am waiting outside the shop.', time: '12 mins ago' }, { id: 2, sender: 'vendor', text: 'Sending the parcel out in 1 min.', time: '11 mins ago' }] },
-    { id: 'c-3', participant: 'Sana K.', type: 'Customer', order: 'ORD-1019', avatar: 'S', unread: 0, messages: [{ id: 1, sender: 'customer', text: 'Please add extra ketchup.', time: '5 mins ago' }] }
-  ]);
+  const [conversations, setConversations] = useState([]);
 
   const sendChatMessage = (e) => {
     e.preventDefault();
@@ -251,19 +254,15 @@ export default function App() {
     showToast(`${tableId} cleared & available`);
   };
 
-  // Mock Data + Live Data
   const [orders, setOrders] = useState([]);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
 
-  // Sync vendor auth
   useEffect(() => {
     if (vendor) localStorage.setItem('vendor_auth', JSON.stringify(vendor));
     else localStorage.removeItem('vendor_auth');
   }, [vendor]);
 
-  const DEMO_ORDERS = [];
-
-  // Live Order Fetching with fallback
+  // Mock Data + Live Data
   const fetchOrders = async () => {
     if (!vendor) return;
     setIsFetchingOrders(true);
@@ -396,15 +395,8 @@ export default function App() {
     }
   };
 
-  const [reviews, setReviews] = useState([
-    { id: 'R1', customer: 'Fatima Ahmed', orderId: 'ORD-1010', rating: 5, comment: 'Best pizza in town!', date: '2026-04-05' },
-    { id: 'R2', customer: 'Omar Khan', orderId: 'ORD-0995', rating: 3, comment: 'Burger was a bit cold.', date: '2026-04-02' },
-  ]);
-
-  const [applications, setApplications] = useState([
-    { id: 'APP-103', applicant: 'Bilal Khan', email: 'bilal@email.com', role: 'Assistant Chef', date: '2026-04-04', status: 'Pending' },
-    { id: 'APP-105', applicant: 'Zainab T.', email: 'zainab@email.com', role: 'Kitchen Helper', date: '2026-04-01', status: 'Interviewing' },
-  ]);
+  const [reviews, setReviews] = useState([]);
+  const [applications, setApplications] = useState([]);
 
   if (!vendor) {
     return <LoginPage 
@@ -595,32 +587,29 @@ export default function App() {
               <Target size={20} /> Point of Sale (POS)
             </div>
           )}
+        <nav style={{ padding: '0 15px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, marginTop: 10 }}>
           {[
-            { id: 'orders', icon: ShoppingCart, label: 'Live Orders', req: 'orders' },
-            { id: 'po', icon: Receipt, label: 'Purchase Order', req: 'inventory' },
-            { id: 'pur_inv', icon: Receipt, label: 'Purchase Invoice', req: 'inventory' },
-            { id: 'grn', icon: Layers, label: 'Stock Receiving', req: 'inventory' },
-            { id: 'issuance', icon: Layers, label: 'Stock Issuance', req: 'inventory' },
-            { id: 'production', icon: Workflow, label: 'Stock Production', req: 'inventory' },
-            { id: 'wastage', icon: Trash2, label: 'Stock Wastage', req: 'inventory' },
-            { id: 'transfer', icon: Send, label: 'Stock Transfer', req: 'inventory' },
-            { id: 'adjustment', icon: Settings, label: 'Stock Adjustment', req: 'inventory' },
-            { id: 'audit', icon: BarChart3, label: 'Stock Audit', req: 'inventory' },
-            { id: 'accounts', icon: BookOpen, label: 'Accounts Entries', req: 'accounts' },
-            { id: 'reports', icon: BarChart3, label: 'System Reports', req: 'reports' },
-            { id: 'hr', icon: Users2, label: 'Staff & HR', req: 'hr' },
-            { id: 'products', icon: Package, label: 'Menu Catalog', req: 'products' },
-            { id: 'settings', icon: Settings, label: 'Settings', req: 'settings' }
-          ].filter(nav => hasPerm(nav.req)).map(nav => (
-            <div key={nav.id} onClick={() => { setActiveTab(nav.id); setMobileMenu(false); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 8, marginBottom: 8, cursor: 'pointer',
-                background: activeTab === nav.id ? '#8de02c' : 'transparent',
-                color: activeTab === nav.id ? '#000' : '#64748b', fontWeight: 600
-              }}>
-              <nav.icon size={18} /> {nav.label}
-            </div>
+            { id: 'orders', label: 'Live Orders', icon: ShoppingCart },
+            { id: 'pos', label: 'POS Terminal', icon: Receipt },
+            { id: 'products', label: 'Menu Catalog', icon: Package },
+            { id: 'inventory', label: 'Inventory ERP', icon: Layers },
+            { id: 'gallery', label: 'Media Gallery', icon: Image },
+            { id: 'reports', label: 'Business Reports', icon: BarChart3 },
+            { id: 'settings', label: 'Configurations', icon: Settings }
+          ].map(item => (
+            <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenu(false); }} style={{
+              display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', borderRadius: 12, border: 'none',
+              background: activeTab === item.id ? '#39FF14' : 'transparent',
+              color: activeTab === item.id ? '#000' : theme.text,
+              cursor: 'pointer', fontWeight: 600, transition: '0.2s', textAlign: 'left'
+            }}>
+              <item.icon size={20} /> <span style={{ fontSize: '0.95rem' }}>{item.label}</span>
+              {item.id === 'orders' && orders.filter(o => o.status === 'new').length > 0 && (
+                <span style={{ marginLeft: 'auto', background: activeTab === 'orders' ? '#000' : '#39FF14', color: activeTab === 'orders' ? '#fff' : '#000', padding: '2px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 800 }}>{orders.filter(o => o.status === 'new').length}</span>
+              )}
+            </button>
           ))}
+        </nav>
         </div>
 
         <div style={{ padding: 20, borderTop: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#ef4444', fontWeight: 600 }} onClick={() => setVendor(null)}>
@@ -679,49 +668,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* TABLE MAP */}
-              <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ margin: 0, color: theme.text, display: 'flex', alignItems: 'center', gap: 8 }}>🍽 Dine-In Tables</h3>
-                  <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#39FF14', display: 'inline-block' }}></span> Available</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#ef4444', display: 'inline-block' }}></span> Occupied</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#f97316', display: 'inline-block' }}></span> Reserved</span>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
-                  {tables.map(t => (
-                    <div key={t.id} onClick={() => { if (t.status === 'occupied') setSelectedTable(t); }}
-                      style={{ padding: 16, borderRadius: 14, textAlign: 'center', cursor: t.status === 'occupied' ? 'pointer' : 'default', border: `2px solid ${t.status === 'occupied' ? '#ef4444' : t.status === 'reserved' ? '#f97316' : '#39FF14'}`, background: t.status === 'occupied' ? 'rgba(239,68,68,0.08)' : t.status === 'reserved' ? 'rgba(249,115,22,0.08)' : 'rgba(57,255,20,0.05)', transition: 'all 0.2s', position: 'relative' }}>
-                      <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🪑</div>
-                      <div style={{ fontWeight: 900, color: theme.text, fontSize: '0.95rem' }}>{t.label}</div>
-                      {t.status === 'occupied' && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700, marginTop: 4 }}>{t.orderId} • {t.guests}G</div>}
-                      {t.status === 'available' && <div style={{ fontSize: '0.7rem', color: '#39FF14', fontWeight: 700, marginTop: 4 }}>OPEN</div>}
-                      {t.status === 'occupied' && <button onClick={(e) => { e.stopPropagation(); clearTable(t.id); }} style={{ marginTop: 6, padding: '3px 8px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}>Clear</button>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Table Detail Modal */}
-              {selectedTable && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }} onClick={() => setSelectedTable(null)}>
-                  <div onClick={e => e.stopPropagation()} style={{ background: theme.card, padding: 30, borderRadius: 20, width: 420, border: `1px solid ${theme.border}`, animation: 'floatIn 0.3s' }}>
-                    <h2 style={{ margin: '0 0 16px 0', color: theme.text }}>{selectedTable.label}</h2>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Order</div><div style={{ fontWeight: 900, color: '#39FF14' }}>{selectedTable.orderId}</div></div>
-                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Guests</div><div style={{ fontWeight: 900, color: theme.text }}>{selectedTable.guests}</div></div>
-                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Status</div><div style={{ fontWeight: 900, color: '#ef4444' }}>{selectedTable.status.toUpperCase()}</div></div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => { showToast(`Reprinting bill for ${selectedTable.orderId}`); }} style={{ flex: 1, padding: 14, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Printer size={16} /> Reprint Bill</button>
-                      <button onClick={() => { clearTable(selectedTable.id); setSelectedTable(null); }} style={{ flex: 1, padding: 14, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}>Clear Table</button>
-                    </div>
-                    <button onClick={() => setSelectedTable(null)} style={{ width: '100%', padding: 12, marginTop: 12, background: 'transparent', color: theme.muted, border: 'none', cursor: 'pointer', fontWeight: 700 }}>Close</button>
-                  </div>
-                </div>
-              )}
-
               {/* ORDER PIPELINE */}
               <div style={{ display: 'flex', gap: 20, overflowX: 'auto', paddingBottom: 20 }}>
                 {[
@@ -732,28 +678,35 @@ export default function App() {
                   { id: 'cancelled', label: 'Cancelled', color: '#ef4444', icon: X },
                   { id: 'refunded', label: 'Refunded', color: '#ec4899', icon: RefreshCw }
                 ].map(col => (
-                  <div key={col.id} style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, minWidth: 300, flex: '0 0 auto', opacity: ['cancelled', 'refunded'].includes(col.id) ? 0.7 : 1 }}>
+                  <div key={col.id} style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, minWidth: 320, flex: '0 0 auto', opacity: ['cancelled', 'refunded'].includes(col.id) ? 0.7 : 1 }}>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: col.color, marginBottom: 16 }}>
                       <col.icon size={18} /> {col.label} ({orders.filter(o => o.status === col.id).length})
                     </h3>
                     {orders.filter(o => o.status === col.id).length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders</div>}
                     {orders.filter(o => o.status === col.id).map(o => (
                       <div key={o.id} style={{ background: theme.bg, border: `1px solid ${col.color}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                          <span style={{ fontWeight: 900, color: theme.text }}>{o.id}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                          <span style={{ fontWeight: 900, color: theme.text, fontSize: '1.1rem' }}>#{o.id.split('-').pop()}</span>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: theme.bg, border: `1px solid ${col.color}`, color: col.color }}>{o.source || 'Takeaway'}</span>
+                            <span style={{ fontSize: '0.6rem', fontWeight: 900, padding: '2px 8px', borderRadius: 6, background: theme.card, border: `1px solid ${col.color}`, color: col.color, textTransform: 'uppercase' }}>{o.source || 'Takeaway'}</span>
                             <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
                           </div>
                         </div>
                         <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}>
-                          {(o.source === 'Takeaway' || !o.source) && <div><b>Walk-in Customer</b></div>}
-                          {o.source === 'Delivery' && <div><b>{o.customer || 'Delivery Customer'}</b><br/><span style={{fontSize:'0.75rem', color:theme.muted}}>{o.contact} | {o.address}</span></div>}
+                          {['Foodpanda', 'B2B', 'App'].includes(o.source) && <div><b>{o.customer}</b></div>}
+                          {o.source === 'Delivery' && <div><b>{o.customer || 'Delivery Customer'}</b><br/><span style={{fontSize:'0.7rem', color:theme.muted}}>{o.contact} | {o.address}</span></div>}
                           {o.source === 'Dine-In' && <div><b>Table: {o.table || 'Walk-in'}</b></div>}
-                          {['POS', 'Kiosk', 'Waiter'].includes(o.source) && <div><b>{o.customer}</b></div>}
-                          <div style={{ marginTop: 6, padding: 8, background: 'rgba(0,0,0,0.03)', borderRadius: 6 }}>{o.items}</div>
+                          {(!o.source || o.source === 'Takeaway' || o.source === 'POS' || o.source === 'Kiosk') && <div><b>{o.customer || 'Walk-in Customer'}</b></div>}
+                          
+                          <div style={{ marginTop: 8, padding: 10, background: 'rgba(0,0,0,0.04)', borderRadius: 8, borderLeft: `3px solid ${col.color}` }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: 4 }}>ITEMS:</div>
+                            {o.items}
+                          </div>
                         </div>
-                        <div style={{ fontWeight: 800, color: col.color, marginBottom: 12 }}>Rs {o.total}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                          <span style={{ fontWeight: 900, fontSize: '1.1rem', color: col.color }}>Rs {o.total}</span>
+                          <span style={{ fontSize: '0.7rem', color: theme.muted, fontWeight: 700 }}>ID: {o.id}</span>
+                        </div>
                         
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {col.id === 'new' && (
@@ -1820,6 +1773,30 @@ export default function App() {
             </div>
           )}
 
+          {activeTab === 'gallery' && (
+            <div style={{ animation: 'fadeIn 0.4s' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <h2 style={{ margin: 0 }}>Media Gallery</h2>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {['All', 'Restaurant', 'Shops', 'Categories', 'Banners', 'Coupons'].map(cat => (
+                    <button key={cat} onClick={()=>setReportTab(cat.toLowerCase())} style={{ padding: '8px 16px', borderRadius: 10, border: `1px solid ${theme.border}`, background: reportTab === cat.toLowerCase() ? '#39FF14' : 'transparent', color: reportTab === cat.toLowerCase() ? '#000' : theme.text, fontWeight: 700, cursor: 'pointer' }}>{cat}</button>
+                  ))}
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 20 }}>
+                {/* Visualizing folders like the screenshot */}
+                {['Restaurant', 'Shops', 'Deliveryman', 'Banners', 'Brands', 'Blogs', 'Categories', 'Coupons', 'Discounts'].map(folder => (
+                  <div key={folder} style={{ background: theme.card, borderRadius: 20, padding: 24, border: `1px solid ${theme.border}`, textAlign: 'center', cursor: 'pointer', transition: '0.2s' }} onMouseOver={e=>e.currentTarget.style.transform='translateY(-5px)'} onMouseOut={e=>e.currentTarget.style.transform='none'}>
+                    <div style={{ fontSize: '4rem', marginBottom: 12 }}>📁</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>{folder}</div>
+                    <div style={{ fontSize: '0.75rem', color: theme.muted, marginTop: 4 }}>124 Items</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'settings' && (
             <MasterConfiguration theme={theme} darkMode={darkMode} showToast={showToast} API="https://api.galaxyexpress.pk" vendor={vendor} />
           )}
@@ -1829,3 +1806,10 @@ export default function App() {
     </div>
   );
 }
+
+const Image = ({ size, color }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+);
+const RefreshCw = ({ size, color }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+);
