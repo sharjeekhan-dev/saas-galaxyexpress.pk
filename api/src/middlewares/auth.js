@@ -17,7 +17,13 @@ export const requireAuth = (req, res, next) => {
 
 export const requireRole = (roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'Forbidden: Authentication required' });
+    }
+    if (req.user.role === 'SUPER_ADMIN') {
+      return next();
+    }
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
     }
     next();

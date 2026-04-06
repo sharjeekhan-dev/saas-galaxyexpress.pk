@@ -43,7 +43,7 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
         throw new Error(data.error || 'Login failed');
       }
 
-      if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(data.user.role)) {
+      if (data.user.role !== 'SUPER_ADMIN' && allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(data.user.role)) {
         throw new Error('Access denied: Unauthorized role for this application');
       }
 
