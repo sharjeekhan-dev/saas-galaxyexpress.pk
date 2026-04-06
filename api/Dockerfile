@@ -1,32 +1,24 @@
-FROM node:20-slim AS builder
+FROM node:20
 
 RUN apt-get update && apt-get install -y openssl libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Copy dependency manifests
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm install
 
+# Install dependencies and ensure PRISMA GENERATE succeeds
+RUN npm install
+RUN npx prisma generate
+
+# Copy project source
 COPY . .
 
-# Run build if using TypeScript (omitted for JS version)
-
-FROM node:20-slim
-RUN apt-get update && apt-get install -y \
-  openssl \
-  libssl-dev \
-  ca-certificates \
-  build-essential \
-  python3 \
-  && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/src ./src
-
+# Final environment variables
 ENV NODE_ENV=production
+ENV PORT=5000
+
+EXPOSE 5000
 
 CMD ["npm", "start"]
