@@ -11,57 +11,73 @@ import LoginPage from '../../../shared/LoginPage.jsx';
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 export default function App() {
-  // REMOVED INSECURE AUTO-LOGIN FROM LOCALSTORAGE TO FORCE PRODUCTION CREDENTIALS
   const [vendor, setVendor] = useState(null); 
-
-
+  const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('orders');
-  const [reportTab, setReportTab] = useState('gallery'); // For gallery folders
+  const [reportTab, setReportTab] = useState('gallery');
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [previewMode, setPreviewMode] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('vendor_dark') !== 'false'); // Default dark
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [subTab, setSubTab] = useState('coa');
-  const [isMobile, setIsMobile] = useState(false);
-  const [processingId, setProcessingId] = useState(null);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('vendor_dark') !== 'false');
   const [toastMessage, setToastMessage] = useState(null);
+  const [outlets, setOutlets] = useState([]);
+  const [activeOutletId, setActiveOutletId] = useState(null);
 
-  // --- Authentic User State ---
-  const [currentUser, setCurrentUser] = useState(() => {
+  // Auth & Initial Data Link
+  useEffect(() => {
     const savedUser = localStorage.getItem('erp_user');
-    if (savedUser) {
+    const token = localStorage.getItem('erp_token');
+    if (savedUser && token) {
       const u = JSON.parse(savedUser);
-      return { 
-        id: u.id, 
-        name: u.name, 
-        role: u.role, 
+      setVendor(u);
+      setCurrentUser({
+        id: u.id, name: u.name, role: u.role,
         permissions: ['SUPER_ADMIN', 'VENDOR_ADMIN'].includes(u.role) ? ['ALL'] : ['pos', 'orders']
-      };
+      });
     }
-    return null;
-  });
+  }, []);
+
+  const fetchOutlets = async () => {
+    if (!vendor) return;
+    try {
+      const res = await fetch(`${API}/api/outlets`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setOutlets(data);
+        setActiveOutletId(data[0].id);
+      }
+    } catch (e) { console.error('Outlets sync error', e); }
+  };
+
+  useEffect(() => { if (vendor) fetchOutlets(); }, [vendor]);
+
+  if (!vendor) {
+    return (
+      <LoginPage 
+        title="Vendor ERP Node" 
+        subtitle="Access your business control center" 
+        icon="🚀" 
+        allowedRoles={['VENDOR_ADMIN', 'SUPER_ADMIN', 'MANAGER']}
+        onSuccess={(data) => {
+          setVendor(data.user);
+          setCurrentUser({
+            id: data.user.id, name: data.user.name, role: data.user.role,
+            permissions: ['SUPER_ADMIN', 'VENDOR_ADMIN'].includes(data.user.role) ? ['ALL'] : ['pos', 'orders']
+          });
+        }}
+      />
+    );
+  }
+
   const hasPerm = (p) => currentUser?.permissions?.includes('ALL') || currentUser?.permissions?.includes(p);
 
-  // Chat State
+  // Communication & POS State
   const [activeChat, setActiveChat] = useState('c-1');
   const [chatInput, setChatInput] = useState('');
   const [conversations, setConversations] = useState([]);
-
-  const sendChatMessage = (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    setConversations(prev => prev.map(chat => {
-      if (chat.id === activeChat) {
-        return { ...chat, messages: [...chat.messages, { id: Date.now(), sender: 'vendor', text: chatInput, time: 'Just now' }] };
-      }
-      return chat;
-    }));
-    setChatInput('');
-  };
-
-  // --- POS State ---
   const [posCart, setPosCart] = useState([]);
   const [posType, setPosType] = useState('Takeaway');
+  
   const [posDiscount, setPosDiscount] = useState({ type: 'amount', value: 0 });
   const [fpCode, setFpCode] = useState('');
   const [riderAssigned, setRiderAssigned] = useState('');
@@ -161,17 +177,38 @@ export default function App() {
     setOrders(prev => [newOrder, ...prev]);
 
     // Send silently to Backend API
-    fetch(`${API}/orders`, {
+    fetch(`${API}/api/pos/orders`, {
        method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ ...newOrder, tenantId: vendor.id })
-    }).catch(e => console.error("Could not post order. Optimistic save applied."));
+       headers: { 
+         'Content-Type': 'application/json',
+         'Authorization': `Bearer ${localStorage.getItem('erp_token')}`
+       },
+       body: JSON.stringify({ 
+         outletId: activeOutletId,
+         type: posType.toUpperCase().replace('DINE-IN', 'DINE_IN'),
+         totalAmount: grandTotal,
+         items: posCart.map(c => ({
+           productId: c.id,
+           quantity: c.qty,
+           unitPrice: c.price
+         })),
+         payments: [{
+           method: 'CASH',
+           amount: grandTotal,
+           status: 'PAID'
+         }],
+         tableId: posType === 'Dine-In' ? posCustomer : null,
+         deliveryAddress: posType === 'Delivery' ? deliveryCustomer.address : null
+       })
+    }).then(res => {
+      if (res.ok) fetchOrders();
+    }).catch(e => console.error("Could not post order.", e));
 
     setPosCart([]);
     setCheckoutModal(false);
     setIsSalesReturn(false);
     setPosDiscount({ type: 'amount', value: 0 });
-    showToast(isSalesReturn ? 'Sales Return Approved & Posted!' : 'Invoice generated automatically on Accounts module & Printed!');
+    showToast(isSalesReturn ? 'Sales Return Approved & Posted!' : 'Order Saved & Printed!');
   };
 
   // Responsive listener
@@ -264,29 +301,27 @@ export default function App() {
     else localStorage.removeItem('vendor_auth');
   }, [vendor]);
 
-  // Mock Data + Live Data
+  // Live Data Synchronization
   const fetchOrders = async () => {
     if (!vendor) return;
     setIsFetchingOrders(true);
     try {
-      const res = await fetch(`${API}/orders?tenantId=${vendor.id || 'default'}`);
+      const res = await fetch(`${API}/api/pos/orders${activeOutletId ? `?outletId=${activeOutletId}` : ''}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
       if (res.ok) {
         const data = await res.json();
-        if (data && Array.isArray(data.orders)) {
-          setOrders(data.orders.map(o => ({
-            id: o.id || `ORD-${Math.floor(Math.random() * 10000)}`,
-            customer: o.customerInfo?.name || 'Walk-in Customer',
+        if (Array.isArray(data)) {
+          setOrders(data.map(o => ({
+            id: o.id,
+            customer: o.customerInfo?.name || 'Walk-in',
             contact: o.customerInfo?.phone || '',
-            address: o.customerInfo?.address || '',
-            table: o.tableId || null,
-            source: o.source || 'Takeaway',
-            items: Array.isArray(o.items) ? o.items.map(i => `${i.quantity}x ${i.name}`).join(', ') : '',
-            total: o.totalAmount || 0,
-            status: (o.status || 'new').toLowerCase(),
-            time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString() : 'just now'
+            items: o.items?.map(i => `${i.quantity}x ${i.product?.name || 'Item'}`).join(', '),
+            total: o.totalAmount,
+            status: o.status.toLowerCase(),
+            time: new Date(o.createdAt).toLocaleTimeString(),
+            source: o.type
           })));
-        } else {
-          setOrders([]);
         }
       }
     } catch (e) {
@@ -311,10 +346,13 @@ export default function App() {
     setOrders(p => p.map(x => x.id === orderId ? { ...x, status: newStatus } : x));
 
     try {
-      const res = await fetch(`${API}/orders/${orderId.replace('ORD-', '')}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, tenantId: vendor.id })
+      const res = await fetch(`${API}/api/pos/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('erp_token')}`
+        },
+        body: JSON.stringify({ status: newStatus })
       });
 
       if (!res.ok) throw new Error('API Error');
@@ -337,10 +375,12 @@ export default function App() {
     if (!vendor) return;
     setIsFetchingProducts(true);
     try {
-      const res = await fetch(`${API}/products?tenantId=${vendor.id}`);
+      const res = await fetch(`${API}/api/pos/products`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
       if (res.ok) {
         const data = await res.json();
-        setProducts(Array.isArray(data) ? data : (data.products || []));
+        setProducts(Array.isArray(data) ? data : []);
       } else {
         throw new Error('API failed');
       }

@@ -54,19 +54,17 @@ export default function ReportsPage() {
         fetch(`${API}/api/reports/inventory`, { headers: h }).then(r => r.json()),
         fetch(`${API}/api/reports/vendors`, { headers: h }).then(r => r.json())
       ]);
-      setData({ sales: resSales || {}, inventory: resInv || {}, vendors: resVend || [] });
+      setData({ 
+        sales: resSales || { totalSales: 0, orderCount: 0, dailyBreakdown: [] }, 
+        inventory: resInv || { totalValuation: 0, stocks: [] }, 
+        vendors: resVend || [] 
+      });
     } catch (e) {
       console.error('Report fetch error', e);
-      // Mock data for UI demonstration
-      setData({
-        sales: {
-          totalSales: 452800, orderCount: 142, dailyBreakdown: [
-            { date: 'Mon', sales: 42000 }, { date: 'Tue', sales: 58000 }, { date: 'Wed', sales: 41000 },
-            { date: 'Thu', sales: 72000 }, { date: 'Fri', sales: 65000 }, { date: 'Sat', sales: 89000 }, { date: 'Sun', sales: 95000 }
-          ]
-        },
-        inventory: { totalValuation: 1250000, stocks: [] },
-        vendors: []
+      setData({ 
+        sales: { totalSales: 0, orderCount: 0, dailyBreakdown: [] }, 
+        inventory: { totalValuation: 0, stocks: [] }, 
+        vendors: [] 
       });
     }
     setLoading(false);
