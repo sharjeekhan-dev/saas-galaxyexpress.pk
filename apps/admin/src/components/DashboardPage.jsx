@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, DollarSign, ShoppingCart, Users, Building,
-  Activity, PieChart, Clock, Package, Bike, Store, ArrowUpRight } from 'lucide-react';
+  Activity, PieChart, Clock, Package, Bike, Store, ArrowUpRight, Zap } from 'lucide-react';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement,
@@ -18,7 +18,57 @@ const chartBase = {
   }
 };
 
+// Generate live activities from orders data
+function generateActivities(orders) {
+  const base = [
+    { text:'Platform dashboard accessed by <strong>Super Admin</strong>', time:'just now', color:'blue', type:'login' },
+  ];
+
+  if (orders.length > 0) {
+    const recent = orders.slice(0, 3);
+    recent.forEach((o, i) => {
+      const num = o.orderNumber || o.id?.slice(-5) || 'N/A';
+      if (o.status === 'DELIVERED') {
+        base.push({ text:`Order <strong>#${num}</strong> delivered successfully`, time:`${(i+1)*3} min ago`, color:'green', type:'order' });
+      } else if (o.status === 'PREPARING') {
+        base.push({ text:`Order <strong>#${num}</strong> being prepared in kitchen`, time:`${(i+1)*5} min ago`, color:'orange', type:'order' });
+      } else if (o.status === 'PENDING') {
+        base.push({ text:`New order <strong>#${num}</strong> received — $${o.totalAmount?.toFixed(2) || '0.00'}`, time:`${(i+1)*2} min ago`, color:'blue', type:'order' });
+      } else if (o.status === 'CANCELLED') {
+        base.push({ text:`Order <strong>#${num}</strong> was cancelled`, time:`${(i+1)*7} min ago`, color:'red', type:'order' });
+      }
+    });
+  }
+
+  // Add some platform-wide activities
+  base.push(
+    { text:'New vendor <strong>Pizza Palace</strong> registration', time:'12 min ago', color:'blue', type:'vendor' },
+    { text:'Logo updated in <strong>Branding Settings</strong>', time:'25 min ago', color:'purple', type:'settings' },
+    { text:'Low stock: <strong>Chicken Breast</strong> (5 units left)', time:'32 min ago', color:'orange', type:'inventory' },
+    { text:'Rider <strong>Ahmed K.</strong> went offline', time:'45 min ago', color:'red', type:'rider' },
+    { text:'Daily report generated for <strong>Main Branch</strong>', time:'1 hr ago', color:'purple', type:'report' },
+    { text:'New customer <strong>Sana K.</strong> registered via app', time:'1.5 hr ago', color:'green', type:'customer' },
+    { text:'POS terminal opened at <strong>DHA Branch</strong>', time:'2 hr ago', color:'blue', type:'pos' },
+  );
+
+  return base.slice(0, 10);
+}
+
 export default function DashboardPage({ stats, orders, onNav }) {
+  const [activities, setActivities] = useState([]);
+  const [liveTime, setLiveTime] = useState(new Date());
+
+  // Update activities when orders change
+  useEffect(() => {
+    setActivities(generateActivities(orders));
+  }, [orders]);
+
+  // Live clock
+  useEffect(() => {
+    const t = setInterval(() => setLiveTime(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   const revenueData = {
     labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     datasets: [{ data: [18000,24000,32000,28000,45000,52000,48000,61000,55000,72000,68000,stats.totalRevenue||80000],
@@ -39,13 +89,6 @@ export default function DashboardPage({ stats, orders, onNav }) {
   };
 
   const recentOrders = orders.slice(0,8);
-  const activities = [
-    { text:'New vendor <strong>Pizza Palace</strong> registration', time:'2 min ago', color:'blue' },
-    { text:'Order <strong>#ORD-4521</strong> delivered successfully', time:'5 min ago', color:'green' },
-    { text:'Low stock: <strong>Chicken Breast</strong> (5 units left)', time:'12 min ago', color:'orange' },
-    { text:'Rider <strong>Ahmed K.</strong> went offline', time:'18 min ago', color:'red' },
-    { text:'Daily report generated for <strong>Main Branch</strong>', time:'1 hr ago', color:'purple' },
-  ];
 
   const kpis = [
     { label:'Total Revenue', value:`$${(stats.totalRevenue||0).toLocaleString()}`, trend:'+12.5%', icon:DollarSign, color:'purple' },
@@ -97,7 +140,10 @@ export default function DashboardPage({ stats, orders, onNav }) {
         <div className="glass-card">
           <div className="card-header">
             <div className="card-title"><ShoppingCart size={16}/>Recent Orders</div>
-            <button className="btn btn-sm btn-outline" onClick={() => onNav('orders')}>View All</button>
+            <div className="flex gap-8 items-center">
+              <span className="live-dot" />
+              <button className="btn btn-sm btn-outline" onClick={() => onNav('orders')}>View All</button>
+            </div>
           </div>
           <div className="table-wrapper" style={{border:'none',borderRadius:0}}>
             <table>
@@ -146,7 +192,10 @@ export default function DashboardPage({ stats, orders, onNav }) {
           <div className="glass-card">
             <div className="card-header">
               <div className="card-title"><Activity size={16}/>Live Activity</div>
-              <span className="live-dot" />
+              <div className="flex items-center gap-8">
+                <span className="text-xs text-muted">{liveTime.toLocaleTimeString()}</span>
+                <span className="live-dot" />
+              </div>
             </div>
             <div className="activity-list">
               {activities.map((a,i) => (

@@ -95,12 +95,55 @@ export default function POSTerminal({ products, onRefresh }) {
   };
 
   const printInvoice = () => {
-    const printContents = document.getElementById('printable-invoice').innerHTML;
-    const originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContents;
-    window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload(); // Quick restore of React state
+    if (!success) return;
+    const itemRows = success.items.map(i =>
+      `<tr><td style="padding:6px 0;border-bottom:1px dashed #ccc">${i.name}</td><td style="padding:6px 0;border-bottom:1px dashed #ccc;text-align:center">x${i.quantity}</td><td style="padding:6px 0;border-bottom:1px dashed #ccc;text-align:right">$${(i.unitPrice * i.quantity).toFixed(2)}</td></tr>`
+    ).join('');
+    const html = `<!DOCTYPE html><html><head><title>Invoice #${success.orderNumber}</title>
+    <style>
+      @page { size: 80mm auto; margin: 5mm; }
+      body { font-family: 'Courier New', monospace; color: #000; margin: 0; padding: 10px; font-size: 13px; max-width: 80mm; }
+      h2 { margin: 0; font-size: 18px; text-align: center; }
+      p { margin: 2px 0; }
+      .sep { border-bottom: 1px dashed #000; margin: 8px 0; }
+      table { width: 100%; border-collapse: collapse; }
+      .total-row { display: flex; justify-content: space-between; padding: 3px 0; }
+      .grand { font-weight: bold; font-size: 15px; border-top: 2px solid #000; margin-top: 6px; padding-top: 6px; }
+      .center { text-align: center; }
+    </style></head><body>
+    <h2>GALAXY EXPRESS</h2>
+    <p class="center">Super Market Branch</p>
+    <p class="center">Tax ID: 123456789</p>
+    <div class="sep"></div>
+    <p>Order: #${success.orderNumber}</p>
+    <p>Date: ${success.date}</p>
+    <p>Type: ${success.type}</p>
+    ${success.type === 'DELIVERY' && success.customerDetails ? `
+    <div class="sep"></div>
+    <p>Customer: ${success.customerDetails.name}</p>
+    <p>Phone: ${success.customerDetails.phone}</p>
+    <p>Address: ${success.customerDetails.address}</p>` : ''}
+    <div class="sep"></div>
+    <table><thead><tr><th style="text-align:left">Item</th><th>Qty</th><th style="text-align:right">Total</th></tr></thead>
+    <tbody>${itemRows}</tbody></table>
+    <div class="sep"></div>
+    <div class="total-row"><span>Subtotal</span><span>$${(success.totalAmount - success.taxAmount + success.discount).toFixed(2)}</span></div>
+    ${success.discount > 0 ? `<div class="total-row"><span>Discount</span><span>-$${success.discount.toFixed(2)}</span></div>` : ''}
+    <div class="total-row"><span>Tax & Services</span><span>$${success.taxAmount.toFixed(2)}</span></div>
+    <div class="sep"></div>
+    <div class="total-row grand"><span>TOTAL</span><span>$${success.totalAmount.toFixed(2)}</span></div>
+    <div class="sep"></div>
+    <div class="total-row"><span>Paid (${success.payments[0].method})</span><span>$${cashTendered || success.totalAmount.toFixed(2)}</span></div>
+    <div class="total-row"><span>Change/Bakaya</span><span>$${success.changeDue?.toFixed(2)}</span></div>
+    <div class="center" style="margin-top:20px">
+      <p>Thank you for your visit!</p>
+      <p>Powered by GalaxyERP SaaS</p>
+    </div>
+    </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
   };
 
   return (

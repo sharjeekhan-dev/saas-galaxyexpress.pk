@@ -13,6 +13,7 @@ import OrdersPage from './components/OrdersPage.jsx';
 import ProductsPage from './components/ProductsPage.jsx';
 import POSTerminal from './components/POSTerminal.jsx';
 import KdsScreen from './components/KdsScreen.jsx';
+import TenantsPage from './components/TenantsPage.jsx';
 import VendorsPage from './components/VendorsPage.jsx';
 import RidersPage from './components/RidersPage.jsx';
 import InventoryPage from './components/InventoryPage.jsx';
@@ -230,7 +231,12 @@ function AdminDashboard({ user, onLogout }) {
     }));
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Load data once + live polling every 8 seconds
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 8000);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   // Close sidebar on nav click (mobile)
   const navigate = (id) => { setPage(id); setSidebarOpen(false); };
