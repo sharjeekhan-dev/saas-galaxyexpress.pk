@@ -859,3 +859,6 @@ textarea.form-input{resize:vertical;min-height:80px;}
   body{background:#fff;color:#000;}
   .glass-card,.stat-card,.table-wrapper{box-shadow:none;border:1px solid #ddd;}
 }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }

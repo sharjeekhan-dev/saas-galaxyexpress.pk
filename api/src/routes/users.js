@@ -30,12 +30,16 @@ router.post('/', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT
       name: z.string().min(2),
       email: z.string().email(),
       password: z.string().min(6),
-      role: z.enum(['TENANT_ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'VENDOR', 'RIDER', 'CUSTOMER', 'KITCHEN']),
+      role: z.enum(['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER', 'CASHIER', 'WAITER', 'VENDOR', 'RIDER', 'CUSTOMER', 'KITCHEN']),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
 
     const { name, email, password, role } = parsed.data;
+
+    if (role === 'SUPER_ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Only Super Admins can create Super Admins' });
+    }
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await req.prisma.user.create({

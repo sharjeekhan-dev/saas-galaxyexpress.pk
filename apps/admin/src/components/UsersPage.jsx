@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { API, headers } from '../App.jsx';
-import { Users, Plus, Edit, Trash2, X, Check, Shield } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, X, Check, Shield, Loader } from 'lucide-react';
 
 const ROLES = ['SUPER_ADMIN','TENANT_ADMIN','MANAGER','CASHIER','WAITER','VENDOR','RIDER','CUSTOMER','KITCHEN'];
 const ROLE_COLOR = {
@@ -25,6 +25,7 @@ export default function UsersPage({ users, onRefresh }) {
   const [showModal, setShowModal] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
   const [search, setSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const filtered = users.filter(u =>
     !search || u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -33,14 +34,23 @@ export default function UsersPage({ users, onRefresh }) {
 
   const createUser = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
     const f = new FormData(e.target);
     try {
-      await fetch(`${API}/api/users`, {
+      const res = await fetch(`${API}/api/users`, {
         method:'POST', headers:headers(),
         body:JSON.stringify({ name:f.get('name'), email:f.get('email'), password:f.get('password'), role:f.get('role') })
       });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create user');
+      }
       setShowModal(false); onRefresh();
-    } catch {}
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const deleteUser = async (id) => {
@@ -77,8 +87,11 @@ export default function UsersPage({ users, onRefresh }) {
                 </div>
               )}
               <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={()=>setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create User</button>
+                <button type="button" className="btn btn-outline" onClick={()=>setShowModal(false)} disabled={isSaving}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {isSaving && <Loader size={16} className="spin" />}
+                  {isSaving ? 'Proceeding...' : 'Create User'}
+                </button>
               </div>
             </form>
           </div>
