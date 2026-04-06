@@ -296,6 +296,12 @@ model Product {
   recipeItems   RecipeItem[]
   modifiers     ProductModifier[]
   variants      ProductVariant[]
+  
+  purchaseInvoiceLines PurchaseInvoiceLine[]
+  stockIssuanceLines   StockIssuanceLine[]
+  stockReceivingLines  StockReceivingLine[]
+  stockAdjustmentLines StockAdjustmentLine[]
+  wastageLines         WastageLine[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
