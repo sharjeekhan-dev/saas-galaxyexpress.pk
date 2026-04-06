@@ -54,17 +54,17 @@ export default function ReportsPage() {
         fetch(`${API}/api/reports/inventory`, { headers: h }).then(r => r.json()),
         fetch(`${API}/api/reports/vendors`, { headers: h }).then(r => r.json())
       ]);
-      setData({ 
-        sales: resSales || { totalSales: 0, orderCount: 0, dailyBreakdown: [] }, 
-        inventory: resInv || { totalValuation: 0, stocks: [] }, 
-        vendors: resVend || [] 
+      setData({
+        sales: resSales || { totalSales: 0, orderCount: 0, dailyBreakdown: [] },
+        inventory: resInv || { totalValuation: 0, stocks: [] },
+        vendors: resVend || []
       });
     } catch (e) {
       console.error('Report fetch error', e);
-      setData({ 
-        sales: { totalSales: 0, orderCount: 0, dailyBreakdown: [] }, 
-        inventory: { totalValuation: 0, stocks: [] }, 
-        vendors: [] 
+      setData({
+        sales: { totalSales: 0, orderCount: 0, dailyBreakdown: [] },
+        inventory: { totalValuation: 0, stocks: [] },
+        vendors: []
       });
     }
     setLoading(false);
