@@ -109,6 +109,8 @@ model Tenant {
   apiKeys         ApiKeyConfig[]
   departments     Department[]
   employees       Employee[]
+  units           Unit[]
+  categories      Category[]
   commissionLedger CommissionLedger[]
   journalEntries  JournalEntry[]
   dailyClosings   DailyClosing[]
@@ -225,13 +227,39 @@ model KdsStation {
 // MODULE: INVENTORY & PRODUCTION
 // =============================================
 
+model Unit {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  name        String
+  shortName   String
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+}
+
 model Product {
   id            String   @id @default(uuid())
   tenantId      String
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   name          String
   sku           String   @unique
-  category      String
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  unitId        String?
+  unit          Unit?    @relation(fields: [unitId], references: [id])
+  oldCategory   String?  // Legacy field
   description   String?
   price         Float
   cost          Float    @default(0)

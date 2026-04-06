@@ -4,6 +4,7 @@ import {
   Plus, Edit, Trash2, CheckCircle, Clock, Bell, DollarSign, Target, Menu, X, Star, MessageSquare, Send, PhoneCall, Info, Paperclip,
   Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw
 } from 'lucide-react';
+import MasterConfiguration from './components/MasterConfiguration.jsx';
 
 export default function App() {
   const [vendor, setVendor] = useState(() => {
@@ -55,12 +56,16 @@ export default function App() {
   // --- POS State ---
   const [posCart, setPosCart] = useState([]);
   const [posType, setPosType] = useState('Takeaway');
-  const [posDiscount, setPosDiscount] = useState({ type: 'amount', value: 0 }); // type: 'amount' | 'percent'
+  const [posDiscount, setPosDiscount] = useState({ type: 'amount', value: 0 });
   const [fpCode, setFpCode] = useState('');
   const [riderAssigned, setRiderAssigned] = useState('');
   const [posCustomer, setPosCustomer] = useState('Walk-in Customer');
   const [checkoutModal, setCheckoutModal] = useState(false);
   const [isSalesReturn, setIsSalesReturn] = useState(false);
+  const [posServiceCharge, setPosServiceCharge] = useState(0);
+  const [posTaxRate, setPosTaxRate] = useState(16);
+  const [posBillSplit, setPosBillSplit] = useState(1);
+  const [deliveryCustomer, setDeliveryCustomer] = useState({ name: '', phone: '', address: '' });
 
   // A4 / Thermal Print System For POS
   const triggerPOSPrint = (mode = 'thermal') => {
@@ -184,6 +189,22 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  // --- DINE-IN TABLE MANAGEMENT ---
+  const [tables, setTables] = useState(
+    Array.from({ length: 12 }, (_, i) => ({ id: `T-${i + 1}`, label: `Table ${i + 1}`, status: i < 3 ? 'occupied' : 'available', orderId: i < 3 ? `ORD-10${20 + i}` : null, guests: i < 3 ? Math.floor(Math.random() * 4) + 2 : 0 }))
+  );
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [reprintOrderId, setReprintOrderId] = useState(null);
+
+  const assignTable = (tableId, orderId) => {
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'occupied', orderId, guests: 2 } : t));
+    showToast(`Order ${orderId} assigned to ${tableId}`);
+  };
+  const clearTable = (tableId) => {
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'available', orderId: null, guests: 0 } : t));
+    showToast(`${tableId} cleared & available`);
+  };
+
   // Mock Data + Live Data
   const [orders, setOrders] = useState([]);
   const [isFetchingOrders, setIsFetchingOrders] = useState(false);
@@ -195,9 +216,10 @@ export default function App() {
   }, [vendor]);
 
   const DEMO_ORDERS = [
-    { id: 'ORD-1021', customer: 'Ali R.', items: '2x Margherita Pizza, 1x Coke', total: 2550, status: 'new', time: '2 mins ago' },
-    { id: 'ORD-1020', customer: 'Tariq M.', items: '1x Mighty Burger', total: 750, status: 'preparing', time: '12 mins ago' },
-    { id: 'ORD-1019', customer: 'Sana K.', items: '1x Loaded Fries, 2x Pepsi', total: 900, status: 'new', time: '5 mins ago' }
+    { id: 'ORD-1021', customer: 'Ali R.', items: '2x Margherita Pizza, 1x Coke', total: 2550, status: 'new', time: '2 mins ago', source: 'Kiosk', table: 'T-1' },
+    { id: 'ORD-1020', customer: 'Tariq M.', items: '1x Mighty Burger', total: 750, status: 'preparing', time: '12 mins ago', source: 'POS', table: null },
+    { id: 'ORD-1019', customer: 'Sana K.', items: '1x Loaded Fries, 2x Pepsi', total: 900, status: 'new', time: '5 mins ago', source: 'Waiter', table: 'T-3' },
+    { id: 'ORD-1018', customer: 'Kiosk Guest', items: '1x Zinger Box', total: 950, status: 'completed', time: '15 mins ago', source: 'Kiosk', table: 'T-2' }
   ];
 
   // Live Order Fetching with fallback
@@ -531,7 +553,7 @@ export default function App() {
           {isMobile && <X onClick={() => setMobileMenu(false)} style={{ cursor: 'pointer' }} color={theme.text} />}
         </div>
 
-        <div style={{ padding: 20, flex: 1 }}>
+        <div style={{ padding: 20, flex: 1, overflowY: 'auto' }}>
           {hasPerm('pos') && (
             <div onClick={() => { setActiveTab('pos'); setMobileMenu(false); }}
               style={{
@@ -551,6 +573,8 @@ export default function App() {
             { id: 'production', icon: Workflow, label: 'Stock Production', req: 'inventory' },
             { id: 'wastage', icon: Trash2, label: 'Stock Wastage', req: 'inventory' },
             { id: 'transfer', icon: Send, label: 'Stock Transfer', req: 'inventory' },
+            { id: 'adjustment', icon: Settings, label: 'Stock Adjustment', req: 'inventory' },
+            { id: 'audit', icon: BarChart3, label: 'Stock Audit', req: 'inventory' },
             { id: 'accounts', icon: BookOpen, label: 'Accounts Entries', req: 'accounts' },
             { id: 'reports', icon: BarChart3, label: 'System Reports', req: 'reports' },
             { id: 'hr', icon: Users2, label: 'Staff & HR', req: 'hr' },
@@ -614,11 +638,57 @@ export default function App() {
               `}</style>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <h2 style={{ margin: 0 }}>Live Orders Pipeline</h2>
-                <div style={{ background: 'rgba(141,224,44,0.1)', color: '#65a30d', padding: '6px 12px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8de02c' }}></div> Accepting Orders
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ background: 'rgba(141,224,44,0.1)', color: '#65a30d', padding: '6px 12px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8de02c' }}></div> Accepting Orders
+                  </div>
                 </div>
               </div>
 
+              {/* TABLE MAP */}
+              <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20, marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, color: theme.text, display: 'flex', alignItems: 'center', gap: 8 }}>🍽 Dine-In Tables</h3>
+                  <div style={{ display: 'flex', gap: 16, fontSize: '0.75rem' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#39FF14', display: 'inline-block' }}></span> Available</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#ef4444', display: 'inline-block' }}></span> Occupied</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 4, background: '#f97316', display: 'inline-block' }}></span> Reserved</span>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+                  {tables.map(t => (
+                    <div key={t.id} onClick={() => { if (t.status === 'occupied') setSelectedTable(t); }}
+                      style={{ padding: 16, borderRadius: 14, textAlign: 'center', cursor: t.status === 'occupied' ? 'pointer' : 'default', border: `2px solid ${t.status === 'occupied' ? '#ef4444' : t.status === 'reserved' ? '#f97316' : '#39FF14'}`, background: t.status === 'occupied' ? 'rgba(239,68,68,0.08)' : t.status === 'reserved' ? 'rgba(249,115,22,0.08)' : 'rgba(57,255,20,0.05)', transition: 'all 0.2s', position: 'relative' }}>
+                      <div style={{ fontSize: '1.5rem', marginBottom: 4 }}>🪑</div>
+                      <div style={{ fontWeight: 900, color: theme.text, fontSize: '0.95rem' }}>{t.label}</div>
+                      {t.status === 'occupied' && <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700, marginTop: 4 }}>{t.orderId} • {t.guests}G</div>}
+                      {t.status === 'available' && <div style={{ fontSize: '0.7rem', color: '#39FF14', fontWeight: 700, marginTop: 4 }}>OPEN</div>}
+                      {t.status === 'occupied' && <button onClick={(e) => { e.stopPropagation(); clearTable(t.id); }} style={{ marginTop: 6, padding: '3px 8px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', border: 'none', borderRadius: 6, fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}>Clear</button>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table Detail Modal */}
+              {selectedTable && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)' }} onClick={() => setSelectedTable(null)}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: theme.card, padding: 30, borderRadius: 20, width: 420, border: `1px solid ${theme.border}`, animation: 'floatIn 0.3s' }}>
+                    <h2 style={{ margin: '0 0 16px 0', color: theme.text }}>{selectedTable.label}</h2>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Order</div><div style={{ fontWeight: 900, color: '#39FF14' }}>{selectedTable.orderId}</div></div>
+                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Guests</div><div style={{ fontWeight: 900, color: theme.text }}>{selectedTable.guests}</div></div>
+                      <div style={{ flex: 1, background: theme.bg, padding: 12, borderRadius: 10, textAlign: 'center' }}><div style={{ fontSize: '0.7rem', color: theme.muted }}>Status</div><div style={{ fontWeight: 900, color: '#ef4444' }}>{selectedTable.status.toUpperCase()}</div></div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button onClick={() => { showToast(`Reprinting bill for ${selectedTable.orderId}`); }} style={{ flex: 1, padding: 14, background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Printer size={16} /> Reprint Bill</button>
+                      <button onClick={() => { clearTable(selectedTable.id); setSelectedTable(null); }} style={{ flex: 1, padding: 14, background: '#ef4444', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}>Clear Table</button>
+                    </div>
+                    <button onClick={() => setSelectedTable(null)} style={{ width: '100%', padding: 12, marginTop: 12, background: 'transparent', color: theme.muted, border: 'none', cursor: 'pointer', fontWeight: 700 }}>Close</button>
+                  </div>
+                </div>
+              )}
+
+              {/* ORDER PIPELINE */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
                 {/* Pending Column */}
                 <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20 }}>
@@ -626,16 +696,23 @@ export default function App() {
                   {orders.filter(o => o.status === 'new').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No new orders</div>}
                   {orders.filter(o => o.status === 'new').map(o => (
                     <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                         <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
-                        <span style={{ fontSize: '0.8rem', color: theme.muted }}>{o.time}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : o.source === 'Waiter' ? 'rgba(59,130,246,0.15)' : o.source === 'POS' ? 'rgba(57,255,20,0.1)' : 'rgba(249,115,22,0.15)', color: o.source === 'Kiosk' ? '#8b5cf6' : o.source === 'Waiter' ? '#3b82f6' : o.source === 'POS' ? '#39FF14' : '#f97316' }}>{o.source}</span>}
+                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+                        </div>
                       </div>
-                      <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b><br />{o.items}</div>
-                      <div style={{ fontWeight: 800, color: '#39FF14', marginBottom: 16 }}>Rs {o.total}</div>
-                      <button disabled={processingId === o.id} style={{ width: '100%', padding: 10, background: darkMode ? '#39FF14' : '#0f172a', color: darkMode ? '#000' : 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
-                        onClick={() => updateOrderStatus(o.id, 'PREPARING')}>
-                        {processingId === o.id ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Accept & Prep
-                      </button>
+                      <div style={{ marginBottom: 6, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b><br />{o.items}</div>
+                      {o.table && <div style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: 800, marginBottom: 6 }}>🪑 {o.table}</div>}
+                      <div style={{ fontWeight: 800, color: '#39FF14', marginBottom: 12 }}>Rs {o.total}</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button disabled={processingId === o.id} style={{ flex: 1, padding: 10, background: darkMode ? '#39FF14' : '#0f172a', color: darkMode ? '#000' : 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 600, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
+                          onClick={() => updateOrderStatus(o.id, 'PREPARING')}>
+                          {processingId === o.id ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Accept
+                        </button>
+                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -646,15 +723,44 @@ export default function App() {
                   {orders.filter(o => o.status === 'preparing').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders in prep</div>}
                   {orders.filter(o => o.status === 'preparing').map(o => (
                     <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                         <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
-                        <span style={{ fontSize: '0.8rem', color: theme.muted }}>{o.time}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : o.source === 'Waiter' ? 'rgba(59,130,246,0.15)' : 'rgba(57,255,20,0.1)', color: o.source === 'Kiosk' ? '#8b5cf6' : o.source === 'Waiter' ? '#3b82f6' : '#39FF14' }}>{o.source}</span>}
+                          {o.table && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>🪑 {o.table}</span>}
+                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+                        </div>
                       </div>
                       <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b><br />{o.items}</div>
-                      <button disabled={processingId === o.id} style={{ width: '100%', padding: 10, background: '#3b82f6', color: 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
-                        onClick={() => updateOrderStatus(o.id, 'COMPLETED')}>
-                        {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Mark Ready
-                      </button>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button disabled={processingId === o.id} style={{ flex: 1, padding: 10, background: '#3b82f6', color: 'white', borderRadius: 8, border: 'none', cursor: processingId === o.id ? 'not-allowed' : 'pointer', fontWeight: 700, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, opacity: processingId === o.id ? 0.7 : 1 }}
+                          onClick={() => updateOrderStatus(o.id, 'COMPLETED')}>
+                          {processingId === o.id ? <Loader2 size={16} className="spin" /> : <CheckCircle size={16} />} Mark Ready
+                        </button>
+                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '10px 14px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, cursor: 'pointer', color: theme.muted }}><Printer size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Completed Column */}
+                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 20 }}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', marginBottom: 16 }}><CheckCircle size={18} /> Completed ({orders.filter(o => o.status === 'completed').length})</h3>
+                  {orders.filter(o => o.status === 'completed').length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No completed orders yet</div>}
+                  {orders.filter(o => o.status === 'completed').map(o => (
+                    <div key={o.id} style={{ background: theme.bg, border: `1px solid ${theme.border}`, padding: 16, borderRadius: 12, marginBottom: 12, opacity: 0.7 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontWeight: 800, color: theme.text }}>{o.id}</span>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {o.source && <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: o.source === 'Kiosk' ? 'rgba(139,92,246,0.15)' : 'rgba(57,255,20,0.1)', color: o.source === 'Kiosk' ? '#8b5cf6' : '#39FF14' }}>{o.source}</span>}
+                          <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 6, fontSize: '0.9rem', color: theme.text }}><b>{o.customer}</b> — {o.items}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 800, color: '#16a34a' }}>Rs {o.total} ✓</span>
+                        <button onClick={() => showToast(`Reprinting ${o.id}...`)} style={{ padding: '6px 12px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 6, cursor: 'pointer', color: theme.muted, fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}><Printer size={12} /> Reprint</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -861,14 +967,15 @@ export default function App() {
             </div>
           )}
 
-          {/* REPORTS VIEW */}
+          {/* REPORTS VIEW — FULL ERP CLONE */}
 
           {activeTab === 'reports' && (
             <div>
               <div style={{ display: 'flex', gap: 10, marginBottom: 24, overflowX: 'auto', paddingBottom: 8 }}>
-                <button onClick={() => setReportTab('overview')} style={tabBtn(reportTab === 'overview')}>Overview Dashboard</button>
+                <button onClick={() => setReportTab('overview')} style={tabBtn(reportTab === 'overview')}>Overview</button>
                 <button onClick={() => setReportTab('purchases')} style={tabBtn(reportTab === 'purchases')}>Purchase Reports</button>
-                <button onClick={() => setReportTab('consumptions')} style={tabBtn(reportTab === 'consumptions')}>Consumptions & Prod.</button>
+                <button onClick={() => setReportTab('consumptions')} style={tabBtn(reportTab === 'consumptions')}>Consumption Reports</button>
+                <button onClick={() => setReportTab('stocks')} style={tabBtn(reportTab === 'stocks')}>Stock Reports</button>
                 <button onClick={() => setReportTab('invoices')} style={tabBtn(reportTab === 'invoices')}>Invoices & Vouchers</button>
               </div>
 
@@ -893,56 +1000,81 @@ export default function App() {
               )}
 
               {reportTab === 'purchases' && (
-                <div style={{ background: theme.card, padding: 30, borderRadius: 16, border: `1px solid ${theme.border}`, animation: 'fadeIn 0.3s' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, borderBottom: `1px solid ${theme.border}`, paddingBottom: 20 }}>
-                    <div>
-                      <h2 style={{ margin: 0, color: theme.text }}>Advanced Purchase Reports</h2>
-                      <p style={{ margin: '4px 0 0 0', color: theme.muted, fontSize: '0.9rem' }}>Generate detailed ERP metrics based on party, item, and date ranges.</p>
-                    </div>
-                    <button onClick={() => setPreviewMode('purchase')} style={{ background: '#8de02c', color: '#000', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 14px rgba(141,224,44,0.3)' }}>
-                      <Printer size={18} /> Print Report
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 40 }}>
-                    {/* Column 1 */}
-                    <div style={{ flex: '1 1 300px' }}>
-                      <h3 style={{ fontSize: '1rem', color: '#0f172a', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Selection Criteria</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 30 }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginBottom: 6 }}>From Date</label>
-                          <input type="date" style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8, boxSizing: 'border-box' }} defaultValue="2026-04-06" />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#64748b', marginBottom: 6 }}>To Date</label>
-                          <input type="date" style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8, boxSizing: 'border-box' }} defaultValue="2026-04-06" />
-                        </div>
+                <div style={{ animation: 'fadeIn 0.3s' }}>
+                  <div style={{ display: 'flex', gap: 24 }}>
+                    {/* LEFT: Selection Criteria */}
+                    <div style={{ width: 340, flexShrink: 0, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24 }}>
+                      <h3 style={{ margin: '0 0 20px 0', color: '#8de02c', textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: 2 }}>Selection Criteria</h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                        <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>From Date</label><input type="date" defaultValue="2026-04-06" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
+                        <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>To Date</label><input type="date" defaultValue="2026-04-06" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
                       </div>
-
-                      <h3 style={{ fontSize: '1rem', color: '#0f172a', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Group Information</h3>
-                      <div style={{ display: 'grid', gap: 12, marginBottom: 30 }}>
-                        <select style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8 }}><option>All Departments</option><option>Kitchen Operations</option><option>Packaging</option></select>
-                        <select style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8 }}><option>Select Group / Category</option><option>Raw Materials</option><option>Beverages</option></select>
-                        <select style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8 }}><option>Sub Group (Optional)</option></select>
-                        <input style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: 8, boxSizing: 'border-box' }} placeholder="Title Account Search..." />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                        <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>B.Pro</label><select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select></div>
+                        <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>B.Ind</label><select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select></div>
                       </div>
+                      <h3 style={{ margin: '0 0 12px 0', color: '#8de02c', textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: 2 }}>Group Information</h3>
+                      <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+                        <select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>All Departments</option><option>Kitchen</option></select>
+                        <select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>Group / Category</option><option>Raw Materials</option></select>
+                        <select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>Sub Group</option></select>
+                        <input placeholder="Title Search..." style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} />
+                      </div>
+                      <h3 style={{ margin: '0 0 12px 0', color: '#8de02c', textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: 2 }}>Report Type</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {['Party Wise Consolidated', 'Item Wise Consolidated', 'Party Wise Items Detailed', 'Item Wise Partys Detailed', 'Item Detailed (Party & Voucher)', 'Purchase Register / Ledger', 'Items Rate Update History'].map((r, i) => (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: '0.85rem', color: theme.text, fontWeight: i === 2 ? 800 : 400 }}><input type="radio" name="purRpt" defaultChecked={i === 2} style={{ accentColor: '#8de02c' }} />{r}</label>
+                        ))}
+                      </div>
+                      <button onClick={() => setPreviewMode('purchase')} style={{ width: '100%', marginTop: 20, padding: 14, background: '#39FF14', color: '#000', border: 'none', borderRadius: 10, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(57,255,20,0.3)' }}><Printer size={18} /> Generate & Print</button>
                     </div>
 
-                    {/* Column 2 */}
-                    <div style={{ flex: '1 1 300px', background: theme.bg, padding: 24, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                      <h3 style={{ fontSize: '1rem', color: '#0f172a', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Consolidated Reports</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" defaultChecked style={{ accentColor: '#8de02c' }} /> Party Wise Consolidated</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Item Wise Consolidated</label>
+                    {/* RIGHT: Live Report Preview */}
+                    <div style={{ flex: 1, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, overflowX: 'auto' }}>
+                      <div style={{ borderBottom: '3px solid #000', paddingBottom: 12, marginBottom: 16 }}>
+                        <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: theme.text }}>{vendor?.name?.toUpperCase() || 'GALAXY EXPRESS'} (PRIVATE) LIMITED</h2>
+                        <div style={{ textAlign: 'center', marginTop: 8 }}><span style={{ background: '#fef9c3', color: '#000', padding: '4px 16px', fontWeight: 900, border: '1px solid #000', fontSize: '0.95rem' }}>PARTY WISE ITEMS DETAILED PURCHASE REPORT</span></div>
+                        <div style={{ textAlign: 'center', marginTop: 6, fontSize: '0.85rem', fontWeight: 700, color: theme.muted }}>FROM : 06/04/2026 TO: 06/04/2026</div>
                       </div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        <thead><tr style={{ borderTop: '2px solid', borderBottom: '2px solid', background: '#fef9c3' }}>
+                          <th style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 900, fontStyle: 'italic' }}>ITEM DESCRIPTION</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 900, fontStyle: 'italic' }}>UOM</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>QTY</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>R.QTY</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>N.Qty</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>RATE</th>
+                          <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>AMOUNT</th>
+                        </tr></thead>
+                        <tbody>
+                          {/* HAFIZ TRADER */}
+                          <tr><td colSpan={7} style={{ padding: '12px 6px 4px', fontWeight: 900, color: theme.text }}>HAFIZ TRADER</td></tr>
+                          {[{ n: 'BEEF MUQADAM,BEEF MINCE', u: 'KG', q: '10.000', rq: '', nq: '10.000', r: '1,350.00', a: '13,500.00' }, { n: 'CHICKEN BONE', u: 'KG', q: '5.900', rq: '', nq: '5.900', r: '150.00', a: '885.00' }, { n: 'CHICKEN KARAHI, WHOLE CHICKEN', u: 'KG', q: '30.000', rq: '', nq: '30.000', r: '724.00', a: '21,720.00' }, { n: 'CHICKEN THAI,CHICKEN QEEMA,BREAST', u: 'KG', q: '59.400', rq: '', nq: '59.400', r: '966.00', a: '57,380.40' }, { n: 'MUTTON BONELESS', u: 'KG', q: '4.450', rq: '', nq: '4.450', r: '2,750.00', a: '12,237.50' }, { n: 'MUTTON KARAHI, WHOLE MUTTON', u: 'KG', q: '25.240', rq: '', nq: '25.240', r: '2,350.00', a: '59,314.00' }].map((item, i) => (
+                            <tr key={i}><td style={{ padding: '4px 6px 4px 20px', color: theme.text }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.rq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.nq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.a}</td></tr>
+                          ))}
+                          <tr style={{ borderTop: '1px solid #e2e8f0' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>HAFIZ TRADER TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>165,118</td></tr>
 
-                      <h3 style={{ fontSize: '1rem', color: '#0f172a', marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Detailed Reports</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Party Wise Items Detailed</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Item Wise Partys Detailed</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Item Detailed (Party & Voucher Wise)</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Purchase Register / Ledger</label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}><input type="radio" name="rptType" style={{ accentColor: '#8de02c' }} /> Items Rate Update History</label>
+                          {/* NAZIR MILK SHOP */}
+                          <tr><td colSpan={7} style={{ padding: '12px 6px 4px', fontWeight: 900, color: theme.text }}>NAZIR MILK SHOP</td></tr>
+                          {[{ n: 'MILK, FRESH MILK', u: 'LTR', q: '56.000', rq: '', nq: '56.000', r: '200.00', a: '11,200.00' }, { n: 'YOGURT FRESH', u: 'KG', q: '32.000', rq: '', nq: '32.000', r: '220.00', a: '7,040.00' }].map((item, i) => (
+                            <tr key={i}><td style={{ padding: '4px 6px 4px 20px', color: theme.text }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.rq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.nq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.a}</td></tr>
+                          ))}
+                          <tr style={{ borderTop: '1px solid #e2e8f0' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>NAZIR MILK SHOP TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>18,240</td></tr>
+
+                          {/* SHEIKH VEGETABLES */}
+                          <tr><td colSpan={7} style={{ padding: '12px 6px 4px', fontWeight: 900, color: theme.text }}>SHEIKH VEGETABLES</td></tr>
+                          {[{ n: 'APPLE', u: 'KG', q: '2.000', rq: '', nq: '2.000', r: '420.00', a: '840.00' }, { n: 'BANANA', u: 'NO/PCS', q: '12.000', rq: '', nq: '12.000', r: '16.66', a: '199.92' }, { n: 'CABBAGE', u: 'KG', q: '5.000', rq: '', nq: '5.000', r: '40.00', a: '200.00' }, { n: 'CAPSICUM', u: 'KG', q: '2.000', rq: '', nq: '2.000', r: '80.00', a: '160.00' }, { n: 'GARLIC', u: 'KG', q: '1.500', rq: '', nq: '1.500', r: '270.00', a: '405.00' }].map((item, i) => (
+                            <tr key={i}><td style={{ padding: '4px 6px 4px 20px', color: theme.text }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.rq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.nq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.a}</td></tr>
+                          ))}
+                          <tr style={{ borderTop: '1px solid #e2e8f0' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>SHEIKH VEGETABLES TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>1,804.92</td></tr>
+
+                          {/* GRAND TOTAL */}
+                          <tr style={{ borderTop: '3px double #000', borderBottom: '3px double #000' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '12px 6px', fontSize: '1rem', color: theme.text }}>GRAND TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1rem', padding: '12px 6px', color: '#39FF14' }}>185,162.92</td></tr>
+                        </tbody>
+                      </table>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, fontSize: '0.75rem', color: theme.muted }}>
+                        <span>Printed on: {new Date().toLocaleString()}</span>
+                        <span>GalaxyERP Report Engine v2</span>
                       </div>
                     </div>
                   </div>
@@ -950,78 +1082,127 @@ export default function App() {
               )}
 
               {reportTab === 'consumptions' && (
-                <div style={{ background: theme.card, padding: 30, borderRadius: 16, border: `1px solid ${theme.border}`, animation: 'fadeIn 0.3s' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, borderBottom: `1px solid ${theme.border}`, paddingBottom: 20 }}>
-                    <div>
-                      <h2 style={{ margin: 0, color: theme.text }}>Consumptions & Productions</h2>
-                      <p style={{ margin: '4px 0 0 0', color: theme.muted, fontSize: '0.9rem' }}>Track material usage, wastage, and compare against sales.</p>
+                <div style={{ animation: 'fadeIn 0.3s', display: 'flex', gap: 24 }}>
+                  <div style={{ width: 340, flexShrink: 0, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24 }}>
+                    <h3 style={{ margin: '0 0 20px 0', color: '#8de02c', textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: 2 }}>Selection Criteria</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                      <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>From Date</label><input type="date" defaultValue="2026-04-05" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
+                      <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>To Date</label><input type="date" defaultValue="2026-04-05" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
                     </div>
-                    <button onClick={() => handleGenerateLiveReport('consumption')} disabled={isGenerating} style={{ background: darkMode ? '#1e293b' : '#0f172a', color: darkMode ? '#f8fafc' : 'white', border: 'none', padding: '10px 24px', borderRadius: 8, fontWeight: 800, cursor: isGenerating ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 14px rgba(0,0,0,0.2)', minWidth: 160, justifyContent: 'center' }}>
-                      {isGenerating ? <><Loader2 size={18} className="spin" /> Fetching...</> : <><Printer size={18} /> Print Analysis</>}
-                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                      <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>B.Pro</label><select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select></div>
+                      <div><label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>B.Ind</label><select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select></div>
+                    </div>
+                    <h3 style={{ margin: '0 0 12px 0', color: '#8de02c', textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: 2 }}>Group Info</h3>
+                    <select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, marginBottom: 20 }}><option>All Departments</option><option>B.B.Q</option><option>FAST FOOD</option></select>
+                    <button onClick={() => handleGenerateLiveReport('consumption')} disabled={isGenerating} style={{ width: '100%', padding: 14, background: '#39FF14', color: '#000', border: 'none', borderRadius: 10, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(57,255,20,0.3)' }}>{isGenerating ? <><Loader2 size={18} className="spin" /> Fetching...</> : <><Printer size={18} /> Generate & Print</>}</button>
+                  </div>
+                  <div style={{ flex: 1, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, overflowX: 'auto' }}>
+                    <div style={{ borderBottom: '3px solid #000', paddingBottom: 12, marginBottom: 16 }}>
+                      <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: theme.text }}>{vendor?.name?.toUpperCase() || 'GALAXY EXPRESS'} (PRIVATE) LIMITED</h2>
+                      <div style={{ textAlign: 'center', marginTop: 8 }}><span style={{ background: '#fef9c3', color: '#000', padding: '4px 16px', fontWeight: 900, border: '1px solid #000', fontSize: '0.95rem' }}>DEPARTMENT WISE ITEMS DETAILED CONSUMPTION REPORT</span></div>
+                      <div style={{ textAlign: 'center', marginTop: 6, fontSize: '0.85rem', fontWeight: 700, color: theme.muted }}>FROM : 05/04/2026 TO: 05/04/2026 BI : ALL</div>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead><tr style={{ borderTop: '2px solid', borderBottom: '2px solid', background: '#fef9c3' }}>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 900, fontStyle: 'italic' }}>ITEM DESCRIPTION</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 900, fontStyle: 'italic' }}>UOM</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>QTY</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>R.QTY</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>N.Qty</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>RATE</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>AMOUNT</th>
+                      </tr></thead>
+                      <tbody>
+                        <tr><td colSpan={7} style={{ padding: '12px 6px 4px', fontWeight: 900, color: theme.text }}>B.B.Q</td></tr>
+                        {[{ n: 'AJWAIN,CAROM SEED', u: 'KG', q: '1.40', r: '', nq: '1.40', rt: '', a: '' }, { n: 'BAKRA RAW', u: 'KG', q: '57.00', r: '36.00', nq: '21.00', rt: '2,250.00', a: '47,250.00' }, { n: 'BEEF MUQADAM,BEEF MINCE', u: 'KG', q: '17.00', r: '15.00', nq: '2.00', rt: '1,350.00', a: '2,700.00' }, { n: 'CHARCOAL', u: 'BAG', q: '120.00', r: '80.00', nq: '40.00', rt: '130.00', a: '5,200.00' }, { n: 'CHICKEN THAI,CHICKEN QEEMA', u: 'KG', q: '196.00', r: '145.00', nq: '53.00', rt: '867.62', a: '45,984.00' }, { n: 'COOKING OIL, CANOLA OIL', u: 'KG', q: '22.00', r: '5.00', nq: '17.00', rt: '459.89', a: '7,818.06' }].map((item, i) => (
+                          <tr key={i}><td style={{ padding: '4px 6px 4px 20px', color: theme.text }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.nq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.rt}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.a}</td></tr>
+                        ))}
+                        <tr style={{ borderTop: '1px solid #e2e8f0' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>B.B.Q TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>108,952.06</td></tr>
+
+                        <tr><td colSpan={7} style={{ padding: '12px 6px 4px', fontWeight: 900, color: theme.text }}>FAST FOOD</td></tr>
+                        {[{ n: 'BURGER BUN', u: 'NO/PCS', q: '450', r: '', nq: '450', rt: '15.00', a: '6,750.00' }, { n: 'CHICKEN BONELESS', u: 'KG', q: '30.00', r: '', nq: '30.00', rt: '724.00', a: '21,720.00' }, { n: 'CHEESE SLICE', u: 'NO/PCS', q: '200', r: '', nq: '200', rt: '12.50', a: '2,500.00' }].map((item, i) => (
+                          <tr key={i}><td style={{ padding: '4px 6px 4px 20px', color: theme.text }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.nq}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.rt}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.a}</td></tr>
+                        ))}
+                        <tr style={{ borderTop: '1px solid #e2e8f0' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>FAST FOOD TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, padding: '8px 6px', color: theme.text }}>30,970.00</td></tr>
+
+                        <tr style={{ borderTop: '3px double #000', borderBottom: '3px double #000' }}><td colSpan={6} style={{ textAlign: 'right', fontWeight: 900, padding: '12px 6px', fontSize: '1rem', color: theme.text }}>GRAND TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1rem', padding: '12px 6px', color: '#39FF14' }}>139,922.06</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* STOCK REPORTS — Baranh ERP Clone */}
+              {reportTab === 'stocks' && (
+                <div style={{ animation: 'fadeIn 0.3s', display: 'flex', gap: 24 }}>
+                  <div style={{ width: 420, flexShrink: 0, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 30 }}>
+                    <div style={{ textAlign: 'right', marginBottom: 20 }}><h2 style={{ margin: 0, color: theme.text, fontSize: '1.4rem', fontWeight: 900 }}>STOCKS</h2></div>
+                    <h3 style={{ margin: '0 0 16px 0', color: '#8de02c', fontSize: '0.95rem', letterSpacing: 2 }}>SELECTION CRITERIA</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+                      <div><label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>From Date</label><input type="date" defaultValue="2026-04-06" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
+                      <div><label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: theme.muted, marginBottom: 4 }}>To Date</label><input type="date" defaultValue="2026-04-06" style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} /></div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+                      <label style={{ fontWeight: 700, color: theme.muted, fontSize: '0.85rem', textAlign: 'right' }}>Location :</label>
+                      <select style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, fontWeight: 700 }}><option>ALL</option><option>BARANH Y-BLOCK</option><option>ELYSIAN SWEETS JHANG</option><option>HD DOLMEN</option><option>HD GULBERG</option><option>HD RAYA</option><option>HD Y-BLOCK</option><option>WAREHOUSE / HQ</option></select>
+                      <label style={{ fontWeight: 700, color: theme.muted, fontSize: '0.85rem', textAlign: 'right' }}>Department :</label>
+                      <input style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} placeholder="All" />
+                      <label style={{ fontWeight: 700, color: theme.muted, fontSize: '0.85rem', textAlign: 'right' }}>Group :</label>
+                      <input style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} placeholder="All" />
+                      <label style={{ fontWeight: 700, color: theme.muted, fontSize: '0.85rem', textAlign: 'right' }}>Sub Group :</label>
+                      <input style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} placeholder="All" />
+                      <label style={{ fontWeight: 700, color: theme.muted, fontSize: '0.85rem', textAlign: 'right' }}>Type :</label>
+                      <input style={{ width: '100%', padding: 10, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} placeholder="All" />
+                    </div>
+
+                    <h3 style={{ margin: '0 0 16px 0', color: '#8de02c', fontSize: '0.95rem', letterSpacing: 2 }}>STOCK REPORTS</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                      {['Stock In Hand', 'Stock In Hand (With Last Cost Rate)', 'Stock In Hand (COMPARISON)'].map((r, i) => (
+                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: theme.text, fontSize: '0.9rem', fontWeight: i === 0 ? 800 : 400, background: i === 0 ? 'rgba(57,255,20,0.08)' : 'transparent', padding: '6px 10px', borderRadius: 8 }}><input type="radio" name="stkRpt" defaultChecked={i === 0} style={{ accentColor: '#8de02c' }} />{r}</label>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+                      {['Stock Inquires (ItemWise)', 'Stock Inquires (GroupWise And ItemWise)'].map((r, i) => (
+                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#3b82f6', fontSize: '0.9rem', fontWeight: 700, padding: '6px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)' }}><input type="radio" name="stkRpt" style={{ accentColor: '#3b82f6' }} />{r}</label>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: theme.text, fontSize: '0.9rem' }}><input type="radio" name="stkRpt" style={{ accentColor: '#8de02c' }} />Rate Change History</label>
+                      <button style={{ padding: '8px 20px', background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, fontWeight: 800, color: theme.text, cursor: 'pointer' }}>Stock Grid</button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {['Item Ledger', 'Item Ledger (Consolidated)', 'Stock Audit History'].map((r, i) => (
+                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: theme.text, fontSize: '0.9rem', padding: '6px 10px', borderRadius: 8 }}><input type="radio" name="stkRpt" style={{ accentColor: '#8de02c' }} />{r}</label>
+                      ))}
+                    </div>
+                    <button onClick={() => showToast('Stock Report Generated!')} style={{ width: '100%', marginTop: 20, padding: 14, background: '#39FF14', color: '#000', border: 'none', borderRadius: 10, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 14px rgba(57,255,20,0.3)' }}><Printer size={18} /> Generate Report</button>
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 40 }}>
-                    {/* Column 1 */}
-                    <div style={{ flex: '1 1 300px' }}>
-                      <h3 style={{ fontSize: '1rem', color: theme.text, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Selection Criteria</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: theme.muted, marginBottom: 6 }}>From Date</label>
-                          <input type="date" style={{ width: '100%', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} defaultValue="2026-04-06" />
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: theme.muted, marginBottom: 6 }}>To Date</label>
-                          <input type="date" style={{ width: '100%', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, boxSizing: 'border-box' }} defaultValue="2026-04-06" />
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 30 }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: theme.muted, marginBottom: 6 }}>B.Pro</label>
-                          <select style={{ width: '100%', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select>
-                        </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: theme.muted, marginBottom: 6 }}>B.Ind</label>
-                          <select style={{ width: '100%', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>ALL</option></select>
-                        </div>
-                      </div>
-
-                      <h3 style={{ fontSize: '1rem', color: theme.text, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Group Information</h3>
-                      <div style={{ display: 'grid', gap: 12, marginBottom: 30 }}>
-                        <select style={{ width: '100%', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8 }}><option>All Departments</option><option>Kitchen Ops</option></select>
-                      </div>
+                  {/* Stock In Hand Preview */}
+                  <div style={{ flex: 1, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, overflowX: 'auto' }}>
+                    <div style={{ borderBottom: '3px solid #000', paddingBottom: 12, marginBottom: 16 }}>
+                      <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: theme.text }}>{vendor?.name?.toUpperCase() || 'GALAXY EXPRESS'} (PRIVATE) LIMITED</h2>
+                      <div style={{ textAlign: 'center', marginTop: 8 }}><span style={{ background: '#fef9c3', color: '#000', padding: '4px 16px', fontWeight: 900, border: '1px solid #000', fontSize: '0.95rem' }}>STOCK IN HAND REPORT</span></div>
+                      <div style={{ textAlign: 'center', marginTop: 6, fontSize: '0.85rem', fontWeight: 700, color: theme.muted }}>AS ON : 06/04/2026 | LOCATION : ALL</div>
                     </div>
-
-                    {/* Column 2 */}
-                    <div style={{ flex: '1 1 500px', background: theme.bg, padding: 24, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <h3 style={{ margin: 0, color: theme.text }}>Real-Time Variance & Food Cost</h3>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <span style={{ background: 'rgba(57,255,20,0.1)', color: '#39FF14', padding: '4px 10px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 800 }}>LIVE SYNC</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-                        <div style={{ background: theme.card, padding: 16, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                          <div style={{ fontSize: '0.8rem', color: theme.muted, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Target Food Cost %</div>
-                          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#3b82f6' }}>28.5%</div>
-                        </div>
-                        <div style={{ background: theme.card, padding: 16, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                          <div style={{ fontSize: '0.8rem', color: theme.muted, textTransform: 'uppercase', fontWeight: 700, marginBottom: 6 }}>Actual Food Cost %</div>
-                          <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#ef4444' }}>31.2% <span style={{ fontSize: '0.8rem', color: '#ef4444' }}>▲ +2.7%</span></div>
-                        </div>
-                      </div>
-
-                      <h4 style={{ margin: '0 0 12px 0', color: theme.text }}>Top Variances (Sales v/s Consumption)</h4>
-                      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                        <thead><tr><th style={{ padding: '10px', color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>Item</th><th style={{ padding: '10px', color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>System Cons.</th><th style={{ padding: '10px', color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>Actual Cons.</th><th style={{ padding: '10px', color: theme.muted, borderBottom: `1px solid ${theme.border}` }}>Variance</th></tr></thead>
-                        <tbody>
-                          <tr><td style={{ padding: '10px', color: theme.text }}>Beef Patty</td><td style={{ padding: '10px', color: theme.text }}>45.5 kg</td><td style={{ padding: '10px', color: theme.text }}>48.2 kg</td><td style={{ padding: '10px', color: '#ef4444', fontWeight: 700 }}>-2.7 kg</td></tr>
-                          <tr><td style={{ padding: '10px', color: theme.text }}>Cooking Oil</td><td style={{ padding: '10px', color: theme.text }}>12 Ltr</td><td style={{ padding: '10px', color: theme.text }}>14.5 Ltr</td><td style={{ padding: '10px', color: '#ef4444', fontWeight: 700 }}>-2.5 Ltr</td></tr>
-                          <tr><td style={{ padding: '10px', color: theme.text }}>Burger Buns</td><td style={{ padding: '10px', color: theme.text }}>450 pcs</td><td style={{ padding: '10px', color: theme.text }}>448 pcs</td><td style={{ padding: '10px', color: '#39FF14', fontWeight: 700 }}>+2 pcs</td></tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead><tr style={{ borderTop: '2px solid', borderBottom: '2px solid', background: '#fef9c3' }}>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 900, fontStyle: 'italic' }}>ITEM CODE</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 900, fontStyle: 'italic' }}>ITEM DESCRIPTION</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 900, fontStyle: 'italic' }}>UOM</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>QTY</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>RATE</th>
+                        <th style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 900, fontStyle: 'italic' }}>VALUE</th>
+                      </tr></thead>
+                      <tbody>
+                        {[{ c: 'RW-001', n: 'BEEF MUQADAM,BEEF MINCE', u: 'KG', q: '45.500', r: '1,350.00', v: '61,425.00' }, { c: 'RW-002', n: 'CHICKEN BONELESS', u: 'KG', q: '82.000', r: '724.00', v: '59,368.00' }, { c: 'RW-003', n: 'COOKING OIL, CANOLA', u: 'KG', q: '35.000', r: '459.89', v: '16,096.15' }, { c: 'RW-004', n: 'MILK, FRESH MILK', u: 'LTR', q: '24.000', r: '200.00', v: '4,800.00' }, { c: 'RW-005', n: 'BURGER BUN', u: 'NO/PCS', q: '320', r: '15.00', v: '4,800.00' }, { c: 'RW-006', n: 'CHARCOAL', u: 'BAG', q: '15', r: '130.00', v: '1,950.00' }, { c: 'RW-007', n: 'GARLIC', u: 'KG', q: '3.500', r: '270.00', v: '945.00' }, { c: 'PK-001', n: 'BURGER BOX STANDARD', u: 'NO/PCS', q: '450', r: '18.00', v: '8,100.00' }].map((item, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}><td style={{ padding: '6px', color: theme.muted }}>{item.c}</td><td style={{ padding: '6px', color: theme.text, fontWeight: 600 }}>{item.n}</td><td style={{ textAlign: 'center', color: theme.muted }}>{item.u}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.q}</td><td style={{ textAlign: 'right', color: theme.text }}>{item.r}</td><td style={{ textAlign: 'right', color: theme.text, fontWeight: 700 }}>{item.v}</td></tr>
+                        ))}
+                        <tr style={{ borderTop: '3px double #000', borderBottom: '3px double #000' }}><td colSpan={5} style={{ textAlign: 'right', fontWeight: 900, padding: '12px 6px', fontSize: '1rem', color: theme.text }}>GRAND TOTAL :</td><td style={{ textAlign: 'right', fontWeight: 900, fontSize: '1rem', padding: '12px 6px', color: '#39FF14' }}>157,484.15</td></tr>
+                      </tbody>
+                    </table>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, fontSize: '0.75rem', color: theme.muted }}><span>Printed on: {new Date().toLocaleString()}</span><span>GalaxyERP Report Engine v2</span></div>
                   </div>
                 </div>
               )}
@@ -1032,45 +1213,233 @@ export default function App() {
                     <h2 style={{ margin: 0, color: theme.text }}>Invoices & Vouchers</h2>
                     <button style={actBtn}><Plus size={16} /> Create Voucher</button>
                   </div>
-
                   <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
                     <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                      <thead style={{ background: theme.bg, color: theme.muted, fontSize: '0.85rem' }}>
-                        <tr>
-                          <th style={{ padding: '16px 20px', fontWeight: 600 }}>Voucher #</th>
-                          <th style={{ padding: '16px 20px', fontWeight: 600 }}>Type</th>
-                          <th style={{ padding: '16px 20px', fontWeight: 600 }}>Party / Supplier</th>
-                          <th style={{ padding: '16px 20px', fontWeight: 600 }}>Amount</th>
-                          <th style={{ padding: '16px 20px', fontWeight: 600 }}>Status</th>
-                        </tr>
-                      </thead>
+                      <thead style={{ background: theme.bg, color: theme.muted, fontSize: '0.85rem' }}><tr><th style={{ padding: '16px 20px', fontWeight: 600 }}>Voucher #</th><th style={{ padding: '16px 20px', fontWeight: 600 }}>Type</th><th style={{ padding: '16px 20px', fontWeight: 600 }}>Party / Supplier</th><th style={{ padding: '16px 20px', fontWeight: 600 }}>Amount</th><th style={{ padding: '16px 20px', fontWeight: 600 }}>Status</th></tr></thead>
                       <tbody>
-                        <tr style={{ borderTop: `1px solid ${theme.border}` }}>
-                          <td style={{ padding: '16px 20px', fontWeight: 700, color: theme.text }}>PV-2026-001</td>
-                          <td style={{ padding: '16px 20px', color: theme.muted }}>Purchase Invoice</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 600, color: theme.text }}>Fresh Farms Supplies</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 800, color: '#ef4444' }}>- Rs 4,500</td>
-                          <td style={{ padding: '16px 20px' }}><span style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', padding: '4px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700 }}>Pending Approval</span></td>
-                        </tr>
-                        <tr style={{ borderTop: `1px solid ${theme.border}` }}>
-                          <td style={{ padding: '16px 20px', fontWeight: 700, color: theme.text }}>CP-2026-092</td>
-                          <td style={{ padding: '16px 20px', color: theme.muted }}>Cash Payment Voucher</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 600, color: theme.text }}>Local Dairy Co.</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 800, color: '#ef4444' }}>- Rs 1,200</td>
-                          <td style={{ padding: '16px 20px' }}><span style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', padding: '4px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700 }}>Paid</span></td>
-                        </tr>
-                        <tr style={{ borderTop: `1px solid ${theme.border}` }}>
-                          <td style={{ padding: '16px 20px', fontWeight: 700, color: theme.text }}>BR-2026-004</td>
-                          <td style={{ padding: '16px 20px', color: theme.muted }}>Bank Receipt Voucher</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 600, color: theme.text }}>GalaxyExpress Settlement</td>
-                          <td style={{ padding: '16px 20px', fontWeight: 800, color: '#16a34a' }}>+ Rs 12,000</td>
-                          <td style={{ padding: '16px 20px' }}><span style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', padding: '4px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700 }}>Cleared</span></td>
-                        </tr>
+                        {[{ id: 'PV-2026-001', t: 'Purchase Invoice', p: 'Fresh Farms Supplies', a: '- Rs 4,500', s: 'Pending Approval', sc: '#f97316', sb: 'rgba(249,115,22,0.1)' }, { id: 'CP-2026-092', t: 'Cash Payment Voucher', p: 'Local Dairy Co.', a: '- Rs 1,200', s: 'Paid', sc: '#16a34a', sb: 'rgba(34,197,94,0.1)' }, { id: 'BR-2026-004', t: 'Bank Receipt Voucher', p: 'GalaxyExpress Settlement', a: '+ Rs 12,000', s: 'Cleared', sc: '#16a34a', sb: 'rgba(34,197,94,0.1)' }].map((v, i) => (
+                          <tr key={i} style={{ borderTop: `1px solid ${theme.border}` }}><td style={{ padding: '16px 20px', fontWeight: 700, color: theme.text }}>{v.id}</td><td style={{ padding: '16px 20px', color: theme.muted }}>{v.t}</td><td style={{ padding: '16px 20px', fontWeight: 600, color: theme.text }}>{v.p}</td><td style={{ padding: '16px 20px', fontWeight: 800, color: v.a.startsWith('+') ? '#16a34a' : '#ef4444' }}>{v.a}</td><td style={{ padding: '16px 20px' }}><span style={{ background: v.sb, color: v.sc, padding: '4px 10px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 700 }}>{v.s}</span></td></tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* PROCUREMENT & INVENTORY FORMS (Unified Panel) */}
+          {['po', 'pur_inv', 'grn', 'issuance', 'production', 'wastage', 'transfer', 'adjustment', 'audit'].includes(activeTab) && (
+            <div style={{ animation: 'fadeIn 0.3s', display: 'flex', gap: 24, height: 'calc(100vh - 120px)' }}>
+
+              {/* LEFT PANEL: RECENT ENTRIES & DAY-WISE FIND */}
+              <div style={{ width: 340, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', flexShrink: 0, overflow: 'hidden' }}>
+                <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}`, background: 'rgba(0,0,0,0.02)' }}>
+                  <h3 style={{ margin: '0 0 16px 0', color: theme.text, display: 'flex', alignItems: 'center', gap: 8 }}><Calendar size={18} /> Recent Entries</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: theme.bg, borderRadius: 8, border: `1px solid ${theme.border}`, padding: '4px 12px' }}>
+                      <span style={{ fontSize: '0.75rem', color: theme.muted, marginRight: 8, fontWeight: 700, width: 45 }}>DATE:</span>
+                      <input type="date" title="Recent Day Wise Filter" style={{ width: '100%', padding: '8px 4px', background: 'transparent', color: theme.text, border: 'none', outline: 'none', fontWeight: 600 }} defaultValue={new Date().toISOString().split('T')[0]} />
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={16} color={theme.muted} style={{ position: 'absolute', top: 10, left: 12 }} />
+                      <input placeholder={`Search ${activeTab.replace('_', ' ')}...`} style={{ width: '100%', padding: '10px 12px 10px 36px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                  {/* Mock Recent Entries */}
+                  {[1, 2, 3].map((item, idx) => (
+                    <div key={idx} style={{ padding: '16px 20px', borderBottom: `1px solid ${theme.border}`, cursor: 'pointer', transition: '0.2s' }} onMouseOver={e => e.currentTarget.style.background = 'rgba(57,255,20,0.05)'} onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800, color: theme.text }}>{activeTab.toUpperCase()}-104{idx}</span>
+                        <span style={{ fontSize: '0.75rem', color: theme.muted }}>06 Apr 2026</span>
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: theme.muted, marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {['grn', 'pur_inv', 'po'].includes(activeTab) ? 'From: Fresh Farms Supplies' : 'To: Fast Food Dept'}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ background: idx === 0 ? 'rgba(57,255,20,0.1)' : 'rgba(239,68,68,0.1)', color: idx === 0 ? '#39FF14' : '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 800 }}>
+                          {idx === 0 ? 'POSTED' : 'PENDING'}
+                        </span>
+                        <span style={{ fontWeight: 800, color: theme.text }}>Rs {(4500 * (idx + 1)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* RIGHT PANEL: DATA ENTRY FORM */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', paddingRight: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <h2 style={{ margin: 0, color: theme.text, textTransform: 'capitalize', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Layers size={24} color="#8de02c" /> New {activeTab.replace('_', ' ')}
+                  </h2>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <button style={{ ...actBtn, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text }}><Printer size={16} /> Print</button>
+                    <button style={{ ...actBtn, background: '#39FF14', color: '#000', padding: '10px 24px', fontSize: '1rem' }} onClick={() => showToast(`${activeTab.replace('_', ' ').toUpperCase()} Document Saved & Auto-Posted to GL!`)}><CheckCircle size={18} /> Save & Process</button>
+                  </div>
+                </div>
+
+                {/* Form Main Area */}
+                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', marginBottom: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 30 }}>
+
+                    {/* Left Columns of Entry details */}
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Document No.</label>
+                          <input type="text" readOnly defaultValue={`${activeTab.toUpperCase()}-${Math.floor(Math.random() * 90000) + 10000}`} style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Date</label>
+                          <input type="date" defaultValue={new Date().toISOString().split('T')[0]} style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 600, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                        {['grn', 'pur_inv', 'po'].includes(activeTab) && (
+                          <>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Supplier / Party Account</label>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 600, boxSizing: 'border-box', borderLeft: '4px solid #f97316' }}>
+                                <option>Hafiz Traders (A/C: 2001)</option>
+                                <option>Nazir Milk Shop (A/C: 2002)</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Receive To (Stock Location)</label>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
+                                <option>Main Store (HQ)</option>
+                                <option>Kitchen Cold Storage</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                        {['issuance', 'transfer', 'production'].includes(activeTab) && (
+                          <>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Source Location (Issue From)</label>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#f97316', boxSizing: 'border-box', borderLeft: '4px solid #f97316' }}>
+                                <option>Main Store (HQ)</option>
+                                <option>Warehouse B</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Destination Dept. / Project</label>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
+                                <option>Fast Food Department</option>
+                                <option>BBQ & Grill</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                        {['wastage', 'adjustment', 'audit'].includes(activeTab) && (
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Stock Location</label>
+                            <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, boxSizing: 'border-box' }}>
+                              <option>Main Store (HQ)</option>
+                              <option>Kitchen Ops</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Integrations side */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ background: theme.bg, borderRadius: 12, border: `1px solid ${theme.border}`, padding: 16 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8 }}><Target size={16} color="#8de02c" /> Business Configuration</h4>
+                        <div style={{ marginBottom: 12 }}>
+                          <label style={{ display: 'block', marginBottom: 4, fontSize: '0.8rem', color: theme.muted }}>Business Project</label>
+                          <select style={{ width: '100%', padding: '8px', borderRadius: 6, background: theme.card, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', boxSizing: 'border-box' }}>
+                            <option>Default Branch (HQ)</option>
+                            <option>Branch 2 (DHA Phase 6)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', marginBottom: 4, fontSize: '0.8rem', color: theme.muted }}>Business Indicator</label>
+                          <select style={{ width: '100%', padding: '8px', borderRadius: 6, background: theme.card, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', boxSizing: 'border-box' }}>
+                            <option>General Operations</option>
+                            <option>Special Event Catering</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ background: 'rgba(59, 130, 246, 0.05)', borderRadius: 12, border: '1px solid rgba(59, 130, 246, 0.2)', padding: 16 }}>
+                        <h4 style={{ margin: '0 0 12px 0', color: theme.text, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={16} color="#3b82f6" /> Auto Accounts Link (COA)</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <span style={{ fontSize: '0.8rem', color: theme.muted, fontWeight: 700 }}>DR:</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: theme.text }}>{['grn', 'pur_inv'].includes(activeTab) ? '10-01-100 (Store Inventory)' : '40-02-200 (Dept Expense)'}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.8rem', color: theme.muted, fontWeight: 700 }}>CR:</span>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: theme.text }}>{['grn', 'pur_inv'].includes(activeTab) ? '20-00-405 (A/C Payable)' : '10-01-100 (Store Inventory)'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid Table */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 20 }}>
+                    <h3 style={{ margin: 0, color: theme.text, fontSize: '1.1rem' }}>Line Items Detail</h3>
+                    {activeTab === 'audit' && <button style={{ background: 'rgba(57,255,20,0.1)', color: '#65a30d', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 800, cursor: 'pointer', fontSize: '0.8rem' }}>Auto-Load System Stock</button>}
+                  </div>
+
+                  <div style={{ overflowX: 'auto', border: `1px solid ${theme.border}`, borderRadius: 12 }}>
+                    <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: 700 }}>
+                      <thead style={{ background: theme.bg, fontSize: '0.8rem', color: theme.muted, textTransform: 'uppercase' }}>
+                        <tr>
+                          <th style={{ padding: '14px 16px', fontWeight: 800 }}>Item Code & Description</th>
+                          <th style={{ padding: '14px 16px', fontWeight: 800, textAlign: 'center' }}>System Qty</th>
+                          <th style={{ padding: '14px 16px', fontWeight: 800 }}>UOM</th>
+                          {activeTab !== 'audit' && <th style={{ padding: '14px 16px', fontWeight: 800, textAlign: 'right' }}>Rate (Rs)</th>}
+                          {activeTab !== 'audit' && <th style={{ padding: '14px 16px', fontWeight: 800, textAlign: 'right' }}>Total Value</th>}
+                          {activeTab === 'audit' && <th style={{ padding: '14px 16px', fontWeight: 800, textAlign: 'center' }}>Physical Qty</th>}
+                          {activeTab === 'audit' && <th style={{ padding: '14px 16px', fontWeight: 800, textAlign: 'center' }}>Variance</th>}
+                          <th style={{ padding: '14px 16px' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style={{ borderBottom: `1px solid ${theme.border}`, transition: '0.2s', background: theme.card }} onMouseOver={e => e.currentTarget.style.background = theme.bg} onMouseOut={e => e.currentTarget.style.background = theme.card}>
+                          <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                            <input type="text" defaultValue="Beef Patty (Grade A)" style={{ width: '100%', padding: '8px', background: 'transparent', color: theme.text, border: 'none', outline: 'none', fontWeight: 700 }} />
+                            <div style={{ fontSize: '0.75rem', color: theme.muted, paddingLeft: 8 }}>Available: 45.5 kg in Main Store</div>
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', verticalAlign: 'top' }}><input type="number" defaultValue="10" style={{ width: '70px', padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, textAlign: 'center', fontWeight: 800 }} /></td>
+                          <td style={{ padding: '12px 16px', color: theme.muted, fontWeight: 600, verticalAlign: 'top', paddingTop: 20 }}>kg</td>
+                          {activeTab !== 'audit' && <td style={{ padding: '12px 16px', textAlign: 'right', verticalAlign: 'top' }}><input type="number" defaultValue="1200" style={{ width: '100%', maxWidth: 100, padding: '10px', background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 8, textAlign: 'right' }} /></td>}
+                          {activeTab !== 'audit' && <td style={{ padding: '12px 16px', fontWeight: 900, textAlign: 'right', color: theme.text, verticalAlign: 'top', paddingTop: 20 }}>12,000</td>}
+                          {activeTab === 'audit' && <td style={{ padding: '12px 16px', textAlign: 'center', verticalAlign: 'top' }}><input type="number" defaultValue="8" style={{ width: '70px', padding: '10px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: `1px solid #ef4444`, borderRadius: 8, textAlign: 'center', fontWeight: 800 }} /></td>}
+                          {activeTab === 'audit' && <td style={{ padding: '12px 16px', fontWeight: 900, textAlign: 'center', color: '#ef4444', verticalAlign: 'top', paddingTop: 20 }}>-2 kg</td>}
+                          <td style={{ padding: '12px 16px', verticalAlign: 'top', paddingTop: 20 }}><Trash2 size={16} color="#ef4444" style={{ cursor: 'pointer' }} /></td>
+                        </tr>
+                        <tr style={{ background: theme.bg }}>
+                          <td style={{ padding: '16px' }}><input type="text" placeholder="+ Scan Barcode or Type Item Name..." style={{ width: '100%', padding: '8px', background: 'transparent', color: theme.text, border: 'none', outline: 'none', fontWeight: 600 }} /></td>
+                          <td colSpan={activeTab === 'audit' ? 5 : 5} style={{ padding: '16px', textAlign: 'right' }}>
+                            <button style={{ background: '#39FF14', color: '#000', border: 'none', fontWeight: 800, cursor: 'pointer', padding: '10px 20px', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 14px rgba(57,255,20,0.2)' }}><Plus size={16} /> Add Row</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot style={{ background: 'rgba(0,0,0,0.02)' }}>
+                        <tr>
+                          <td colSpan={activeTab === 'audit' ? 2 : 3} style={{ padding: '16px', fontWeight: 800, textAlign: 'right' }}>GRAND TOTAL:</td>
+                          {activeTab !== 'audit' && <td style={{ padding: '16px', fontWeight: 900, textAlign: 'right', fontSize: '1.2rem', color: '#3b82f6' }} colSpan={2}>Rs 12,000</td>}
+                          {activeTab === 'audit' && <td style={{ padding: '16px', fontWeight: 900, textAlign: 'center', fontSize: '1rem', color: '#ef4444' }} colSpan={2}>-2 kg Variance</td>}
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* Remarks */}
+                  <div style={{ marginTop: 24 }}>
+                    <label style={{ display: 'block', marginBottom: 8, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Internal Notes / Narration</label>
+                    <textarea rows={3} style={{ width: '100%', padding: '16px', borderRadius: 12, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', resize: 'none', boxSizing: 'border-box' }} placeholder="Additional notes, gate pass numbers, or descriptions..."></textarea>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1266,21 +1635,21 @@ export default function App() {
 
           {/* -------- POINT OF SALE (POS) ------- */}
           {activeTab === 'pos' && (
-            <div style={{ display: 'flex', height: 'calc(100vh - 120px)', gap: 20, animation: 'fadeIn 0.3s' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: isMobile ? 'auto' : 'calc(100vh - 120px)', gap: 20, animation: 'fadeIn 0.3s' }}>
 
               {/* Product Grid */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, minHeight: isMobile ? 300 : 'auto' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: isMobile ? 'nowrap' : 'wrap', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 8 : 0 }}>
                   {['All', 'Burgers', 'Pizza', 'Drinks', 'Extras'].map(cat => (
-                    <button key={cat} style={{ background: theme.card, padding: '10px 24px', borderRadius: 20, border: `1px solid ${theme.border}`, color: theme.text, fontWeight: 700, cursor: 'pointer', transition: '0.2s', ...cat === 'All' ? { background: '#39FF14', color: '#000', border: 'none' } : {} }}>
+                    <button key={cat} style={{ background: theme.card, padding: '10px 24px', borderRadius: 20, border: `1px solid ${theme.border}`, color: theme.text, fontWeight: 700, cursor: 'pointer', transition: '0.2s', whiteSpace: 'nowrap', ...cat === 'All' ? { background: '#39FF14', color: '#000', border: 'none' } : {} }}>
                       {cat}
                     </button>
                   ))}
-                  <div style={{ flex: 1 }}></div>
+                  <div style={{ flex: 1, minWidth: isMobile ? 20 : 0 }}></div>
                   <button
                     onClick={() => setIsSalesReturn(!isSalesReturn)}
                     disabled={!hasPerm('sales_return')}
-                    style={{ padding: '10px 20px', borderRadius: 20, border: 'none', fontWeight: 800, cursor: hasPerm('sales_return') ? 'pointer' : 'not-allowed', background: isSalesReturn ? '#ef4444' : 'rgba(239,68,68,0.1)', color: isSalesReturn ? '#fff' : '#ef4444', transition: '0.2s', display: 'flex', alignItems: 'center', gap: 8, opacity: hasPerm('sales_return') ? 1 : 0.4 }}>
+                    style={{ padding: '10px 20px', borderRadius: 20, border: 'none', fontWeight: 800, cursor: hasPerm('sales_return') ? 'pointer' : 'not-allowed', background: isSalesReturn ? '#ef4444' : 'rgba(239,68,68,0.1)', color: isSalesReturn ? '#fff' : '#ef4444', transition: '0.2s', display: 'flex', alignItems: 'center', gap: 8, opacity: hasPerm('sales_return') ? 1 : 0.4, whiteSpace: 'nowrap' }}>
                     <RefreshCw size={16} /> {isSalesReturn ? 'Sales Return ACTIVE' : 'Sales Return'}
                   </button>
                 </div>
@@ -1303,7 +1672,7 @@ export default function App() {
               </div>
 
               {/* Cart Panel */}
-              <div style={{ width: 420, background: isSalesReturn ? 'rgba(239,68,68,0.05)' : theme.card, borderRadius: 16, border: `1px solid ${isSalesReturn ? '#ef4444' : theme.border}`, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ width: isMobile ? '100%' : 420, background: isSalesReturn ? 'rgba(239,68,68,0.05)' : theme.card, borderRadius: 16, border: `1px solid ${isSalesReturn ? '#ef4444' : theme.border}`, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}` }}>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
                     <button onClick={() => setPosType('Takeaway')} style={{ flex: 1, padding: '10px 4px', fontSize: '0.85rem', borderRadius: 8, border: 'none', fontWeight: 800, cursor: 'pointer', background: posType === 'Takeaway' ? '#8b5cf6' : theme.bg, color: posType === 'Takeaway' ? '#fff' : theme.muted }}>Takeaway</button>
@@ -1317,8 +1686,10 @@ export default function App() {
                       <input type="text" placeholder="Foodpanda Order Code (e.g. j7x2-82)" value={fpCode} onChange={e => setFpCode(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px dashed #e21b70`, outline: 'none', fontWeight: 800, boxSizing: 'border-box' }} />
                     </div>
                   ) : posType === 'Delivery' ? (
-                    <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <input type="text" placeholder="Customer Addr & Contact" value={posCustomer} onChange={e => setPosCustomer(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', boxSizing: 'border-box' }} />
+                    <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input type="text" placeholder="Customer Name *" value={deliveryCustomer.name} onChange={e => setDeliveryCustomer({ ...deliveryCustomer, name: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 700, boxSizing: 'border-box' }} />
+                      <input type="tel" placeholder="Phone Number *" value={deliveryCustomer.phone} onChange={e => setDeliveryCustomer({ ...deliveryCustomer, phone: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 700, boxSizing: 'border-box' }} />
+                      <textarea rows={2} placeholder="Delivery Address *" value={deliveryCustomer.address} onChange={e => setDeliveryCustomer({ ...deliveryCustomer, address: e.target.value })} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid #f97316`, outline: 'none', fontWeight: 600, boxSizing: 'border-box', resize: 'none' }} />
                       <select value={riderAssigned} onChange={e => setRiderAssigned(e.target.value)} style={{ width: '100%', padding: '10px 14px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', boxSizing: 'border-box' }}>
                         <option value="">Assign Delivery Rider (Auto)</option>
                         <option value="Rider Ali">Rider Ali (Available)</option>
@@ -1356,29 +1727,51 @@ export default function App() {
                 </div>
 
                 <div style={{ padding: '0 20px 20px', borderTop: `1px dashed ${theme.border}`, background: 'rgba(0,0,0,0.1)' }}>
-                  {/* DISCOUNT BOX */}
-                  <div style={{ display: 'flex', padding: '16px 0', borderBottom: `1px dashed ${theme.border}`, marginBottom: 12, alignItems: 'center', gap: 10 }}>
-                    <span style={{ color: theme.muted, fontSize: '0.9rem', width: 80 }}>Discount</span>
-                    <select value={posDiscount.type} onChange={e => setPosDiscount({ ...posDiscount, type: e.target.value })} style={{ padding: '6px 10px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none' }}>
-                      <option value="amount">Rs (Flat)</option>
-                      <option value="percent">% Off</option>
-                    </select>
-                    <input type="number" placeholder="0" value={posDiscount.value} onChange={e => setPosDiscount({ ...posDiscount, value: e.target.value })} style={{ flex: 1, padding: '6px 10px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none' }} />
+                  {/* DISCOUNT / SERVICE / TAX / SPLIT — Admin Only Controls */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '14px 0', borderBottom: `1px dashed ${theme.border}`, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: theme.muted, fontSize: '0.8rem', width: 55 }}>Discount</span>
+                      <select value={posDiscount.type} onChange={e => setPosDiscount({ ...posDiscount, type: e.target.value })} disabled={!hasPerm('ALL')} style={{ padding: '5px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontSize: '0.75rem', opacity: hasPerm('ALL') ? 1 : 0.5 }}>
+                        <option value="amount">Rs</option>
+                        <option value="percent">%</option>
+                      </select>
+                      <input type="number" placeholder="0" value={posDiscount.value} onChange={e => setPosDiscount({ ...posDiscount, value: e.target.value })} disabled={!hasPerm('ALL')} style={{ width: 50, padding: '5px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', opacity: hasPerm('ALL') ? 1 : 0.5 }} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: theme.muted, fontSize: '0.8rem', width: 55 }}>Svc Chg</span>
+                      <input type="number" placeholder="0" value={posServiceCharge} onChange={e => setPosServiceCharge(Number(e.target.value))} disabled={!hasPerm('ALL')} style={{ width: 50, padding: '5px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', opacity: hasPerm('ALL') ? 1 : 0.5 }} />
+                      <span style={{ color: theme.muted, fontSize: '0.75rem' }}>Rs</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: theme.muted, fontSize: '0.8rem', width: 55 }}>Tax %</span>
+                      <input type="number" value={posTaxRate} onChange={e => setPosTaxRate(Number(e.target.value))} disabled={!hasPerm('ALL')} style={{ width: 50, padding: '5px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', opacity: hasPerm('ALL') ? 1 : 0.5 }} />
+                      <span style={{ color: theme.muted, fontSize: '0.75rem' }}>%</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: theme.muted, fontSize: '0.8rem', width: 55 }}>Split</span>
+                      <input type="number" min="1" max="10" value={posBillSplit} onChange={e => setPosBillSplit(Math.max(1, Number(e.target.value)))} style={{ width: 50, padding: '5px', borderRadius: 6, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none' }} />
+                      <span style={{ color: theme.muted, fontSize: '0.75rem' }}>pax</span>
+                    </div>
                   </div>
+                  {!hasPerm('ALL') && <div style={{ fontSize: '0.7rem', color: '#f97316', marginBottom: 8, fontWeight: 600 }}>⚠ Discount, Tax & Service Charge locked — Admin only</div>}
 
                   {(() => {
                     const subtotal = posCart.reduce((s, c) => s + (c.price * c.qty), 0);
                     const discAmt = posDiscount.type === 'amount' ? Number(posDiscount.value) : (subtotal * (Number(posDiscount.value) / 100));
-                    const tax = Math.round((subtotal - discAmt) * 0.16);
-                    const grandTotal = (subtotal - discAmt) + tax;
+                    const taxable = subtotal - discAmt + posServiceCharge;
+                    const tax = Math.round(taxable * (posTaxRate / 100));
+                    const grandTotal = taxable + tax;
+                    const perPerson = posBillSplit > 1 ? Math.ceil(grandTotal / posBillSplit) : grandTotal;
 
                     return (
                       <>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: theme.muted }}><span>Subtotal</span><span>Rs {subtotal}</span></div>
-                        {discAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: '#39FF14' }}><span>Discount applied</span><span>- Rs {discAmt}</span></div>}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, color: theme.muted }}><span>Tax (16%)</span><span>Rs {tax}</span></div>
-                        <button onClick={() => setCheckoutModal(true)} disabled={posCart.length === 0} style={{ width: '100%', padding: '16px', background: posCart.length === 0 ? theme.bg : (isSalesReturn ? '#ef4444' : '#39FF14'), color: posCart.length === 0 ? theme.muted : (isSalesReturn ? '#fff' : '#000'), border: 'none', borderRadius: 12, fontWeight: 900, fontSize: '1.2rem', cursor: posCart.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'space-between', boxShadow: posCart.length > 0 ? (isSalesReturn ? '0 8px 20px rgba(239,68,68,0.3)' : '0 8px 20px rgba(57,255,20,0.3)') : 'none' }}>
-                          <span>{isSalesReturn ? 'REVERSE PAYMENT' : 'PAY NOW'}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: theme.muted, fontSize: '0.85rem' }}><span>Subtotal</span><span>Rs {subtotal}</span></div>
+                        {discAmt > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#39FF14', fontSize: '0.85rem' }}><span>Discount</span><span>- Rs {Math.round(discAmt)}</span></div>}
+                        {posServiceCharge > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#3b82f6', fontSize: '0.85rem' }}><span>Service Charge</span><span>Rs {posServiceCharge}</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: theme.muted, fontSize: '0.85rem' }}><span>Tax ({posTaxRate}%)</span><span>Rs {tax}</span></div>
+                        {posBillSplit > 1 && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#8b5cf6', fontSize: '0.85rem', fontWeight: 800 }}><span>Split ({posBillSplit} pax)</span><span>Rs {perPerson} each</span></div>}
+                        <button onClick={() => setCheckoutModal(true)} disabled={posCart.length === 0} style={{ width: '100%', padding: 16, marginTop: 10, background: posCart.length === 0 ? theme.bg : (isSalesReturn ? '#ef4444' : '#39FF14'), color: posCart.length === 0 ? theme.muted : (isSalesReturn ? '#fff' : '#000'), border: 'none', borderRadius: 12, fontWeight: 900, fontSize: '1.2rem', cursor: posCart.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'space-between', boxShadow: posCart.length > 0 ? (isSalesReturn ? '0 8px 20px rgba(239,68,68,0.3)' : '0 8px 20px rgba(57,255,20,0.3)') : 'none' }}>
+                          <span>{isSalesReturn ? 'REVERSE' : 'PAY NOW'}</span>
                           <span>{isSalesReturn ? '-' : ''}Rs {grandTotal}</span>
                         </button>
                       </>
@@ -1409,6 +1802,10 @@ export default function App() {
               )}
 
             </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <MasterConfiguration theme={theme} darkMode={darkMode} showToast={showToast} API="https://api.galaxyexpress.pk" vendor={vendor} />
           )}
 
         </div>

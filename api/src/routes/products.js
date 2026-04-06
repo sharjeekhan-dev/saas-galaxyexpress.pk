@@ -40,7 +40,8 @@ router.post('/', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT
     const schema = z.object({
       name: z.string().min(1),
       sku: z.string().min(1),
-      category: z.string().min(1),
+      categoryId: z.string().uuid().optional(),
+      unitId: z.string().uuid().optional(),
       description: z.string().optional(),
       price: z.number().min(0),
       cost: z.number().min(0).optional(),
@@ -77,10 +78,10 @@ router.put('/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENA
     const existing = await req.prisma.product.findFirst({ where: { id: req.params.id, tenantId: req.user.tenantId } });
     if (!existing) return res.status(404).json({ error: 'Product not found' });
 
-    const { name, category, description, price, cost, image, isActive, commission } = req.body;
+    const { name, categoryId, unitId, description, price, cost, image, isActive, commission } = req.body;
     const product = await req.prisma.product.update({
       where: { id: req.params.id },
-      data: { name, category, description, price, cost, image, isActive, commission },
+      data: { name, categoryId, unitId, description, price, cost, image, isActive, commission },
       include: { modifiers: true, variants: true }
     });
     res.json(product);
@@ -142,6 +143,92 @@ router.get('/search-b2b', requireAuth, async (req, res) => {
       take: 50
     });
     res.json(results);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
+// CATEGORIES (Master Data)
+// ==========================================
+router.get('/categories/master', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const cats = await req.prisma.category.findMany({
+      where: { tenantId: req.user.tenantId, isActive: true },
+      orderBy: { name: 'asc' }
+    });
+    res.json(cats);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/categories', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    const cat = await req.prisma.category.create({
+      data: {
+        name: req.body.name,
+        description: req.body.description,
+        tenantId: req.user.tenantId
+      }
+    });
+    res.status(201).json(cat);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/categories/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    const cat = await req.prisma.category.update({
+      where: { id: req.params.id },
+      data: { name: req.body.name, description: req.body.description, isActive: req.body.isActive }
+    });
+    res.json(cat);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/categories/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN']), async (req, res) => {
+  try {
+    await req.prisma.category.update({ where: { id: req.params.id }, data: { isActive: false } });
+    res.json({ message: 'Deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
+// UNITS (Master Data)
+// ==========================================
+router.get('/units', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const units = await req.prisma.unit.findMany({
+      where: { tenantId: req.user.tenantId, isActive: true },
+      orderBy: { name: 'asc' }
+    });
+    res.json(units);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/units', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    const unit = await req.prisma.unit.create({
+      data: {
+        name: req.body.name,
+        shortName: req.body.shortName,
+        tenantId: req.user.tenantId
+      }
+    });
+    res.status(201).json(unit);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.put('/units/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    const unit = await req.prisma.unit.update({
+      where: { id: req.params.id },
+      data: { name: req.body.name, shortName: req.body.shortName, isActive: req.body.isActive }
+    });
+    res.json(unit);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/units/:id', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN']), async (req, res) => {
+  try {
+    await req.prisma.unit.update({ where: { id: req.params.id }, data: { isActive: false } });
+    res.json({ message: 'Deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

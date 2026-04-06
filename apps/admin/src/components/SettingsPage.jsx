@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Image, Moon, Sun, Globe, Shield, Bell, Percent, UploadCloud, Plus, X, Check, Edit, Trash2, Search, Save, Languages } from 'lucide-react';
+import { Settings, Image, Moon, Sun, Globe, Shield, Bell, Percent, UploadCloud, Plus, X, Check, Edit, Trash2, Search, Save, Languages, Key } from 'lucide-react';
 
 const TABS = [
   { id:'branding', label:'Branding & Logo', icon:Image },

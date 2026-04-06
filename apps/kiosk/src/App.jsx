@@ -60,15 +60,19 @@ export default function App() {
 
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const [kioskTable, setKioskTable] = useState('');
+
   const placeOrder = async () => {
     setIsProcessing(true);
     try {
       const orderPayload = {
-        tenantId: 'V-001', // Example default for Kiosk
+        tenantId: 'V-001',
         customerInfo: { name: 'Kiosk Customer', type: orderMode },
         items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.qty, price: i.price })),
         totalAmount: total,
-        status: 'PENDING'
+        status: 'PENDING',
+        source: 'Kiosk',
+        table: orderMode === 'DINE_IN' ? kioskTable : null
       };
       
       const res = await fetch(`${API}/orders`, {
@@ -76,14 +80,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderPayload)
       });
-      // Even if it fails locally, simulate success for UI demo continuity
     } catch(e) {
       console.log('API fallback', e);
     } finally {
       setIsProcessing(false);
       setScreen('success');
       setTimeout(() => {
-        setScreen('splash'); setCart([]); setOrderMode(''); setShowCart(false);
+        setScreen('splash'); setCart([]); setOrderMode(''); setShowCart(false); setKioskTable('');
       }, 10000); 
     }
   };
@@ -107,7 +110,7 @@ export default function App() {
       <div className="splash-screen fade-in" style={{background:'var(--bg-dark)'}}>
         <h1 style={{fontSize:'4rem', marginBottom:80, fontWeight:900}}>Where will you be eating?</h1>
         <div className="flex" style={{gap:60}}>
-          <div onClick={()=>{setOrderMode('DINE_IN'); setScreen('menu');}}
+          <div onClick={()=>{setOrderMode('DINE_IN'); setScreen('tableSelect');}}
                style={{background:'var(--bg-card)', padding:80, borderRadius:40, textAlign:'center', cursor:'pointer', border:'4px solid var(--border-color)', width:400}}>
             <UtensilsCrossed size={120} className="text-accent m-auto mb-40" />
             <div style={{fontSize:'3rem', fontWeight:900}}>Dine In</div>
@@ -119,6 +122,24 @@ export default function App() {
           </div>
         </div>
         <button className="btn btn-outline" style={{position:'absolute', bottom:40, left:40, fontSize:'1.5rem', padding:'20px 40px'}} onClick={()=>setScreen('splash')}><ChevronLeft size={30}/> Cancel</button>
+      </div>
+    );
+  }
+
+  if (screen === 'tableSelect') {
+    return (
+      <div className="splash-screen fade-in" style={{background:'var(--bg-dark)'}}>
+        <h1 style={{fontSize:'3.5rem', marginBottom:60, fontWeight:900}}>Select Your Table</h1>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:30, maxWidth:900}}>
+          {Array.from({length:12}, (_,i) => (
+            <div key={i} onClick={()=>{ setKioskTable(`T-${i+1}`); setScreen('menu'); }}
+              style={{background:'var(--bg-card)', padding:40, borderRadius:30, textAlign:'center', cursor:'pointer', border: kioskTable === `T-${i+1}` ? '4px solid var(--accent)' : '4px solid var(--border-color)', transition:'0.2s'}}>
+              <div style={{fontSize:'4rem', marginBottom:10}}>🪑</div>
+              <div style={{fontSize:'2rem', fontWeight:900}}>Table {i+1}</div>
+            </div>
+          ))}
+        </div>
+        <button className="btn btn-outline" style={{position:'absolute', bottom:40, left:40, fontSize:'1.5rem', padding:'20px 40px'}} onClick={()=>setScreen('orderMode')}><ChevronLeft size={30}/> Back</button>
       </div>
     );
   }

@@ -43,6 +43,15 @@
   --neon-pink: #ec4899;
   --neon-blue: #3b82f6;
 
+  /* Geometry */
+  --sidebar-width: 280px;
+  --topbar-height: 70px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
 /* Premium Light Theme Override */
 .light {
   --bg-dark: #f8fafc;
@@ -74,14 +83,6 @@
   --gradient-glass: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.8) 100%);
 }
 
-  /* Geometry */
-  --sidebar-width: 280px;
-  --topbar-height: 70px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-}
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
