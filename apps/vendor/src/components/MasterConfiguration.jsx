@@ -7,8 +7,8 @@ export default function MasterConfiguration({ theme, darkMode, showToast, API, v
   const navs = [
     { id: 'units', label: 'Units (UOM)', icon: Server },
     { id: 'categories', label: 'Categories', icon: Tags },
-    { id: 'users', label: 'Users & Roles', icon: Users },
-    { id: 'general', label: 'General Info', icon: Settings },
+    { id: 'tables', label: 'Dine-In Tables', icon: Server },
+    { id: 'users', label: 'Staff & Roles', icon: Users },
   ];
 
   return (
@@ -39,8 +39,8 @@ export default function MasterConfiguration({ theme, darkMode, showToast, API, v
       <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, minHeight: 400 }}>
         {activeTab === 'units' && <UnitsTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
         {activeTab === 'categories' && <CategoriesTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
-        {activeTab === 'users' && <div style={{ color: theme.muted }}>User & Role management coming soon... (In Progress)</div>}
-        {activeTab === 'general' && <div style={{ color: theme.muted }}>General Info config coming soon... (In Progress)</div>}
+        {activeTab === 'users' && <UsersTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
+        {activeTab === 'tables' && <TablesTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
       </div>
     </div>
   );
@@ -221,6 +221,210 @@ function CategoriesTab({ theme, showToast, API, vendor }) {
               <td style={{ padding: '14px 16px', color: theme.muted }}>{c.description || '-'}</td>
               <td style={{ padding: '14px 16px' }}>
                 <button onClick={() => handleDelete(c.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TablesTab({ theme, showToast, API, vendor }) {
+  const [tables, setTables] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [formData, setFormData] = useState({ name: '', capacity: 2 });
+
+  const fetchTables = async () => {
+    try {
+      const res = await fetch(`${API}/api/tables?tenantId=${vendor?.id || ''}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTables(Array.isArray(data) ? data : []);
+      }
+    } catch(e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchTables(); }, []);
+
+  const handleSave = async () => {
+    if(!formData.name) return showToast('Please provide table name');
+    try {
+      const res = await fetch(`${API}/api/tables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, tenantId: vendor?.id })
+      });
+      if(res.ok) {
+        showToast('Table Created');
+        setFormData({ name: '', capacity: 2 });
+        setIsAdding(false);
+        fetchTables();
+      } else showToast('Error saving table');
+    } catch(e) { showToast('Network Error'); }
+  };
+
+  const handleDelete = async (id) => {
+    if(!window.confirm('Delete table?')) return;
+    try {
+      const res = await fetch(`${API}/api/tables/${id}`, { method: 'DELETE' });
+      if(res.ok) { showToast('Table Deleted'); fetchTables(); }
+    } catch(e) {}
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h3 style={{ margin: 0, color: theme.text }}>Dine-In Tables Management</h3>
+        <button onClick={() => setIsAdding(!isAdding)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isAdding ? <X size={16}/> : <Plus size={16}/>} {isAdding ? 'Cancel' : 'Add Table'}
+        </button>
+      </div>
+
+      {isAdding && (
+        <div style={{ background: theme.bg, padding: 20, borderRadius: 12, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${theme.border}`}}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Table No / Name</label>
+            <input value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} type="text" placeholder="e.g. T-1, Family Hall 1" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Seating Capacity</label>
+            <input value={formData.capacity} onChange={e=>setFormData({...formData, capacity: Number(e.target.value)})} type="number" min="1" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <button onClick={handleSave} style={{ background: '#39FF14', color: '#000', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, height: 42 }}>
+                <Save size={16} /> Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+        <thead style={{ background: theme.bg, color: theme.muted, fontSize: '0.85rem' }}>
+          <tr>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Table Name</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Capacity</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700, width: 100 }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tables.length === 0 && <tr><td colSpan={3} style={{ textAlign:'center', padding: 30, color: theme.muted }}>No tables created.</td></tr>}
+          {tables.map(t => (
+            <tr key={t.id} style={{ borderTop: `1px solid ${theme.border}` }}>
+              <td style={{ padding: '14px 16px', fontWeight: 700, color: theme.text }}>{t.name}</td>
+              <td style={{ padding: '14px 16px', color: theme.muted }}>{t.capacity} Persons</td>
+              <td style={{ padding: '14px 16px' }}>
+                <button onClick={() => handleDelete(t.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UsersTab({ theme, showToast, API, vendor }) {
+  const [users, setUsers] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'CASHIER' });
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${API}/api/users?tenantId=${vendor?.id || ''}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch(e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleSave = async () => {
+    if(!formData.name || !formData.email || !formData.password) return showToast('Please complete all fileds');
+    try {
+      const res = await fetch(`${API}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, tenantId: vendor?.id })
+      });
+      if(res.ok) {
+        showToast('User Account Created');
+        setFormData({ name: '', email: '', password: '', role: 'CASHIER' });
+        setIsAdding(false);
+        fetchUsers();
+      } else showToast('Error creating user');
+    } catch(e) { showToast('Network Error'); }
+  };
+
+  const handleDelete = async (id) => {
+    if(!window.confirm('Revoke access for this user?')) return;
+    try {
+      const res = await fetch(`${API}/api/users/${id}`, { method: 'DELETE' });
+      if(res.ok) { showToast('User Removed'); fetchUsers(); }
+    } catch(e) {}
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h3 style={{ margin: 0, color: theme.text }}>Staff & Roles Management</h3>
+        <button onClick={() => setIsAdding(!isAdding)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isAdding ? <X size={16}/> : <Plus size={16}/>} {isAdding ? 'Cancel' : 'Add User'}
+        </button>
+      </div>
+
+      {isAdding && (
+        <div style={{ background: theme.bg, padding: 20, borderRadius: 12, marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${theme.border}`, flexWrap: 'wrap'}}>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Staff Name</label>
+            <input value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} type="text" placeholder="e.g. Ali" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Email / Username</label>
+            <input value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} type="email" placeholder="ali@pizza.com" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div style={{ flex: '1 1 150px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Password</label>
+            <input value={formData.password} onChange={e=>setFormData({...formData, password: e.target.value})} type="password" placeholder="***" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div style={{ flex: '1 1 150px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>System Role</label>
+            <select value={formData.role} onChange={e=>setFormData({...formData, role: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }}>
+                <option value="VENDOR_ADMIN">Manager</option>
+                <option value="CASHIER">Cashier (POS)</option>
+                <option value="RIDER">Delivery Rider</option>
+            </select>
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <button onClick={handleSave} style={{ background: '#39FF14', color: '#000', border: 'none', padding: '10px 20px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, height: 42 }}>
+                <Save size={16} /> Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+        <thead style={{ background: theme.bg, color: theme.muted, fontSize: '0.85rem' }}>
+          <tr>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Provider Name</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Email ID</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Role</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700, width: 100 }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.length === 0 && <tr><td colSpan={4} style={{ textAlign:'center', padding: 30, color: theme.muted }}>No extra users bound to this tenant.</td></tr>}
+          {users.map(u => (
+            <tr key={u.id} style={{ borderTop: `1px solid ${theme.border}` }}>
+              <td style={{ padding: '14px 16px', fontWeight: 700, color: theme.text }}>{u.name}</td>
+              <td style={{ padding: '14px 16px', color: theme.muted }}>{u.email}</td>
+              <td style={{ padding: '14px 16px', color: theme.muted }}>
+                <span style={{ padding: '4px 8px', background: 'rgba(57,255,20,0.1)', color: '#39FF14', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 }}>{u.role}</span>
+              </td>
+              <td style={{ padding: '14px 16px' }}>
+                <button onClick={() => handleDelete(u.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
               </td>
             </tr>
           ))}

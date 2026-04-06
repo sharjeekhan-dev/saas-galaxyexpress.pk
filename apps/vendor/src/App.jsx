@@ -5,6 +5,7 @@ import {
   Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw
 } from 'lucide-react';
 import MasterConfiguration from './components/MasterConfiguration.jsx';
+import LoginPage from '../../../shared/LoginPage.jsx';
 
 export default function App() {
   const [vendor, setVendor] = useState(() => {
@@ -189,10 +190,26 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // --- DINE-IN TABLE MANAGEMENT ---
-  const [tables, setTables] = useState(
-    Array.from({ length: 12 }, (_, i) => ({ id: `T-${i + 1}`, label: `Table ${i + 1}`, status: i < 3 ? 'occupied' : 'available', orderId: i < 3 ? `ORD-10${20 + i}` : null, guests: i < 3 ? Math.floor(Math.random() * 4) + 2 : 0 }))
-  );
+  const [tables, setTables] = useState([]);
+  
+  const fetchTablesData = async () => {
+    if (!vendor) return;
+    try {
+      const res = await fetch(`https://api.galaxyexpress.pk/api/tables?tenantId=${vendor.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTables((Array.isArray(data) ? data : []).map(t => ({
+          id: t.id,
+          label: t.name,
+          status: 'available',
+          orderId: null,
+          guests: 0
+        })));
+      }
+    } catch(e) {}
+  };
+  
+  useEffect(() => { if(vendor) fetchTablesData(); }, [vendor]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [reprintOrderId, setReprintOrderId] = useState(null);
 
@@ -215,12 +232,7 @@ export default function App() {
     else localStorage.removeItem('vendor_auth');
   }, [vendor]);
 
-  const DEMO_ORDERS = [
-    { id: 'ORD-1021', customer: 'Ali R.', items: '2x Margherita Pizza, 1x Coke', total: 2550, status: 'new', time: '2 mins ago', source: 'Kiosk', table: 'T-1' },
-    { id: 'ORD-1020', customer: 'Tariq M.', items: '1x Mighty Burger', total: 750, status: 'preparing', time: '12 mins ago', source: 'POS', table: null },
-    { id: 'ORD-1019', customer: 'Sana K.', items: '1x Loaded Fries, 2x Pepsi', total: 900, status: 'new', time: '5 mins ago', source: 'Waiter', table: 'T-3' },
-    { id: 'ORD-1018', customer: 'Kiosk Guest', items: '1x Zinger Box', total: 950, status: 'completed', time: '15 mins ago', source: 'Kiosk', table: 'T-2' }
-  ];
+  const DEMO_ORDERS = [];
 
   // Live Order Fetching with fallback
   const fetchOrders = async () => {
@@ -240,11 +252,11 @@ export default function App() {
             time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString() : 'just now'
           })));
         } else {
-          setOrders(prev => prev.length ? prev : DEMO_ORDERS);
+          setOrders([]);
         }
       }
     } catch (e) {
-      setOrders(prev => prev.length ? prev : DEMO_ORDERS);
+      console.error("Order fetch error", e);
     } finally {
       setIsFetchingOrders(false);
     }
@@ -299,11 +311,7 @@ export default function App() {
         throw new Error('API failed');
       }
     } catch (e) {
-      // Fallback for broken APIs as instructed
-      setProducts([
-        { id: 'P1', name: 'Margherita Pizza', price: 1200, category: 'Pizza', stock: 'In Stock' },
-        { id: 'P2', name: 'Mighty Burger', price: 750, category: 'Burger', stock: 'In Stock' }
-      ]);
+      console.error('Failed to fetch products', e);
     } finally {
       setIsFetchingProducts(false);
     }
@@ -366,23 +374,13 @@ export default function App() {
   ]);
 
   if (!vendor) {
-    return (
-      <div style={{ minHeight: '100vh', background: theme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ background: theme.card, padding: 40, borderRadius: 20, width: '100%', maxWidth: 400, boxShadow: '0 20px 40px rgba(0,0,0,0.05)', textAlign: 'center' }}>
-          <Store size={48} color="#8de02c" style={{ margin: '0 auto 20px' }} />
-          <h2 style={{ marginBottom: 10, color: theme.text }}>Vendor Portal</h2>
-          <div style={{ color: theme.muted, marginBottom: 30 }}>Manage your cloud restaurant</div>
-
-          <input className="form-input" style={{ width: '100%', padding: 12, marginBottom: 16, border: `1px solid ${theme.border}`, borderRadius: 8, background: theme.bg, color: theme.text }} placeholder="Email Address" defaultValue="vendor@pizzapalace.com" />
-          <input className="form-input" type="password" style={{ width: '100%', padding: 12, marginBottom: 24, border: `1px solid ${theme.border}`, borderRadius: 8, background: theme.bg, color: theme.text }} placeholder="Password" defaultValue="password123" />
-
-          <button style={{ width: '100%', padding: 14, background: '#8de02c', color: '#000', fontWeight: 800, border: 'none', borderRadius: 8, cursor: 'pointer' }}
-            onClick={() => setVendor({ name: 'Pizza Palace', id: 'V-001', revenue: 45000 })}>
-            Login to Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    return <LoginPage 
+             title="Vendor Portal" 
+             subtitle="Manage your cloud restaurant" 
+             icon={<Store size={48} color="#8de02c" />} 
+             onSuccess={(data) => setVendor({ ...data.user, id: data.user.tenantId || data.user.id })} 
+             allowedRoles={['VENDOR', 'VENDOR_ADMIN', 'SUPER_ADMIN', 'CASHIER']} 
+           />;
   }
 
   // --- REPORT PREVIEW MODAL (INVOICE / FAST PRINT) ---
