@@ -194,6 +194,9 @@ model Outlet {
   
   tables      Table[]
   inventory   Stock[]
+  purchaseInvoices PurchaseInvoice[] @relation("StoreInvoices")
+  issuances         StockIssuance[]   @relation("StoreIssuances")
+  receivings        StockReceiving[]  @relation("StoreReceivings")
   orders      Order[]
   shifts      Shift[]
   kdsStations KdsStation[]
@@ -306,8 +309,13 @@ model Stock {
   id           String   @id @default(uuid())
   productId    String
   product      Product  @relation(fields: [productId], references: [id])
-  outletId     String
-  outlet       Outlet   @relation(fields: [outletId], references: [id])
+  
+  outletId     String?
+  outlet       Outlet?  @relation(fields: [outletId], references: [id])
+  
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  
   quantity     Float    @default(0)
   lowThreshold Float    @default(0)
   
@@ -584,6 +592,7 @@ model VendorProfile {
   products        Product[]
   payouts         Payout[]
   printers        Printer[] // NEW: Vendor specific printers
+  purchaseInvoices PurchaseInvoice[]
 }
 
 model RiderProfile {
@@ -706,6 +715,9 @@ model Department {
   name        String
   
   employees   Employee[]
+  stocks      Stock[]
+  issuances   StockIssuance[]
+  receivings  StockReceiving[]
 }
 
 model Employee {
@@ -903,3 +915,146 @@ model Media {
   isPublic    Boolean  @default(false)
   createdAt   DateTime @default(now())
 }
+
+
+// =============================================
+// NEW MODULE: ERP STOCK & BUSINESS LOGIC
+// =============================================
+
+enum InventoryTxStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PurchaseInvoice {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  invoiceNumber   String   @unique
+  vendorId        String
+  vendor          VendorProfile @relation(fields: [vendorId], references: [id])
+  storeId         String   // Destination Store/Outlet
+  store           Outlet   @relation(fields: [storeId], references: [id])
+  
+  status          InventoryTxStatus @default(PENDING)
+  totalAmount     Float    @default(0)
+  taxAmount       Float    @default(0)
+  netAmount       Float    @default(0)
+  notes           String?
+  approvedBy      String?  // User name or ID
+  
+  lines           PurchaseInvoiceLine[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PurchaseInvoiceLine {
+  id              String   @id @default(uuid())
+  invoiceId       String
+  invoice         PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Float
+  rate            Float
+  total           Float
+}
+
+model StockIssuance {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  storeId         String   // Source Store/Outlet
+  store           Outlet   @relation(fields: [storeId], references: [id])
+  departmentId    String   // Destination Department
+  department      Department @relation(fields: [departmentId], references: [id])
+  
+  status          InventoryTxStatus @default(PENDING)
+  notes           String?
+  approvedBy      String?
+  
+  lines           StockIssuanceLine[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StockIssuanceLine {
+  id              String   @id @default(uuid())
+  issuanceId      String
+  issuance        StockIssuance @relation(fields: [issuanceId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Float
+}
+
+model StockReceiving {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  departmentId    String   // Source Department
+  department      Department @relation(fields: [departmentId], references: [id])
+  storeId         String   // Destination Store/Outlet
+  store           Outlet   @relation(fields: [storeId], references: [id])
+  
+  status          InventoryTxStatus @default(PENDING)
+  notes           String?
+  approvedBy      String?
+  
+  lines           StockReceivingLine[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StockReceivingLine {
+  id              String   @id @default(uuid())
+  receivingId     String
+  receiving       StockReceiving @relation(fields: [receivingId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Float
+}
+
+model StockAdjustment {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  locationId      String   // Outlet ID or Department ID
+  locationType    String   // "STORE" or "DEPARTMENT"
+  
+  status          InventoryTxStatus @default(PENDING)
+  notes           String?
+  approvedBy      String?
+  
+  lines           StockAdjustmentLine[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StockAdjustmentLine {
+  id              String   @id @default(uuid())
+  adjustmentId    String
+  adjustment      StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  oldQuantity     Float
+  newQuantity     Float
+  difference      Float
+}
+
+model InventoryAuditTrail {
+  id              String   @id @default(uuid())
+  tenantId        String
+  userId          String
+  username        String
+  actionType      String   // PURCHASE, ISSUANCE, RECEIVING, ADJUSTMENT
+  entityId        String   // Reference to Invoice ID etc
+  productId       String
+  beforeQty       Float
+  afterQty        Float
+  changeQty       Float
+  locationType    String   // STORE, DEPARTMENT
+  locationId      String
+  details         String?
+  createdAt       DateTime @default(now())
+}
+

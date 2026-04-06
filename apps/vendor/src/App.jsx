@@ -5,15 +5,15 @@ import {
   Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw
 } from 'lucide-react';
 import MasterConfiguration from './components/MasterConfiguration.jsx';
+import InventoryERP from './components/InventoryERP.jsx';
 import LoginPage from '../../../shared/LoginPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 
 export default function App() {
-  const [vendor, setVendor] = useState(() => {
-    const saved = localStorage.getItem('vendor_auth');
-    return saved ? JSON.parse(saved) : null;
-  }); // { name: 'Pizza Palace', id: 'V-001', ... }
+  // REMOVED INSECURE AUTO-LOGIN FROM LOCALSTORAGE TO FORCE PRODUCTION CREDENTIALS
+  const [vendor, setVendor] = useState(null); 
+
 
   const [activeTab, setActiveTab] = useState('orders');
   const [reportTab, setReportTab] = useState('gallery'); // For gallery folders
@@ -594,7 +594,8 @@ export default function App() {
             { id: 'orders', label: 'Live Orders', icon: ShoppingCart },
             { id: 'pos', label: 'POS Terminal', icon: Receipt },
             { id: 'products', label: 'Menu Catalog', icon: Package },
-            { id: 'inventory', label: 'Inventory ERP', icon: Layers },
+            { id: 'inventory', label: 'Inventory & ERP', icon: Layers },
+            { id: 'accounts', label: 'Finance & Ledger', icon: DollarSign },
             { id: 'gallery', label: 'Media Gallery', icon: Image },
             { id: 'reports', label: 'Business Reports', icon: BarChart3 },
             { id: 'settings', label: 'Configurations', icon: Settings }
@@ -679,22 +680,30 @@ export default function App() {
                     {orders.filter(o => o.status === col.id).length === 0 && <div style={{ color: theme.muted, textAlign: 'center', padding: '20px 0' }}>No orders</div>}
                     {orders.filter(o => o.status === col.id).map(o => (
                       <div key={o.id} style={{ background: theme.bg, border: `1px solid ${col.color}`, padding: 16, borderRadius: 12, marginBottom: 12, transition: '0.2s', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                          <span style={{ fontWeight: 900, color: theme.text, fontSize: '1.1rem' }}>#{o.id.split('-').pop()}</span>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.6rem', fontWeight: 900, padding: '2px 8px', borderRadius: 6, background: theme.card, border: `1px solid ${col.color}`, color: col.color, textTransform: 'uppercase' }}>{o.source || 'Takeaway'}</span>
-                            <span style={{ fontSize: '0.75rem', color: theme.muted }}>{o.time}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                             <span style={{ fontWeight: 900, color: theme.text, fontSize: '1.2rem' }}>#GG-{o.id.split('-').pop()}</span>
+                             <span style={{ fontSize: '0.7rem', color: theme.muted, fontWeight: 700 }}>{o.time}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                             <span style={{ 
+                                fontSize: '0.65rem', fontWeight: 900, padding: '4px 10px', borderRadius: 8, 
+                                background: o.source === 'Delivery' ? 'rgba(249,115,22,0.1)' : (o.source === 'Dine-In' ? 'rgba(59,130,246,0.1)' : (o.source === 'Foodpanda' ? 'rgba(226,27,112,0.1)' : 'rgba(141,224,44,0.1)')), 
+                                color: o.source === 'Delivery' ? '#f97316' : (o.source === 'Dine-In' ? '#3b82f6' : (o.source === 'Foodpanda' ? '#e21b70' : '#65a30d')), 
+                                border: `1px solid ${o.source === 'Delivery' ? '#f97316' : (o.source === 'Dine-In' ? '#3b82f6' : (o.source === 'Foodpanda' ? '#e21b70' : '#8de02c'))}`,
+                                textTransform: 'uppercase' 
+                             }}>{o.source || 'Walk-in'}</span>
                           </div>
                         </div>
                         <div style={{ marginBottom: 10, fontSize: '0.9rem', color: theme.text }}>
-                          {['Foodpanda', 'B2B', 'App'].includes(o.source) && <div><b>{o.customer}</b></div>}
-                          {o.source === 'Delivery' && <div><b>{o.customer || 'Delivery Customer'}</b><br/><span style={{fontSize:'0.7rem', color:theme.muted}}>{o.contact} | {o.address}</span></div>}
-                          {o.source === 'Dine-In' && <div><b>Table: {o.table || 'Walk-in'}</b></div>}
-                          {(!o.source || o.source === 'Takeaway' || o.source === 'POS' || o.source === 'Kiosk') && <div><b>{o.customer || 'Walk-in Customer'}</b></div>}
+                          {['Foodpanda', 'B2B', 'App'].includes(o.source) && <div><b style={{color: '#e21b70'}}>PLATFORM:</b> <b>{o.customer}</b></div>}
+                          {o.source === 'Delivery' && <div><b style={{color: '#f97316'}}>DELIVERY:</b> <b>{o.customer || 'Customer'}</b><br/><span style={{fontSize:'0.75rem', color:theme.muted, fontWeight:600}}>{o.contact} | {o.address}</span></div>}
+                          {o.source === 'Dine-In' && <div><b style={{color: '#3b82f6'}}>DINE-IN:</b> <b>Table {o.table || 'N/A'}</b></div>}
+                          {(!o.source || o.source === 'Takeaway' || o.source === 'POS' || o.source === 'Kiosk') && <div><b style={{color: '#65a30d'}}>WALK-IN:</b> <b>{o.customer || 'Counter Order'}</b></div>}
                           
-                          <div style={{ marginTop: 8, padding: 10, background: 'rgba(0,0,0,0.04)', borderRadius: 8, borderLeft: `3px solid ${col.color}` }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.8rem', marginBottom: 4 }}>ITEMS:</div>
-                            {o.items}
+                          <div style={{ marginTop: 10, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 10, borderLeft: `4px solid ${col.color}` }}>
+                            <div style={{ fontWeight: 800, fontSize: '0.75rem', marginBottom: 6, opacity: 0.5 }}>ORDER DETAILS:</div>
+                            <div style={{ fontWeight: 600, lineHeight: 1.4 }}>{o.items}</div>
                           </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -780,75 +789,7 @@ export default function App() {
 
           {/* INVENTORY MANAGEMENT */}
           {activeTab === 'inventory' && (
-            <div style={{ animation: 'fadeIn 0.3s' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0, color: theme.text }}>Inventory & Production ERP</h2>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <button style={actBtn}><Plus size={16} /> Stock Receive (GRN)</button>
-                  <button style={{ ...actBtn, background: '#39FF14', color: '#000' }}><Printer size={16} /> Audit Report</button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginBottom: 24, overflowX: 'auto', paddingBottom: 8 }}>
-                <button style={tabBtn(subTab === 'live_stock')} onClick={() => setSubTab('live_stock')}>Live Stock</button>
-                <button style={tabBtn(subTab === 'grn')} onClick={() => setSubTab('grn')}>Goods Receive (GRN)</button>
-                <button style={tabBtn(subTab === 'issue')} onClick={() => setSubTab('issue')}>Stock Issue Note</button>
-                <button style={tabBtn(subTab === 'production')} onClick={() => setSubTab('production')}>Production & BOM</button>
-                <button style={tabBtn(subTab === 'wastage')} onClick={() => setSubTab('wastage')}>Wastage Mgmt</button>
-                <button style={tabBtn(subTab === 'transfers')} onClick={() => setSubTab('transfers')}>Branch Transfers</button>
-              </div>
-
-              <div style={{ ...cardBg, padding: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <h3 style={{ margin: 0, color: theme.text }}>{subTab === 'production' ? 'Multi-Level BOM & Batch Production' : 'Real-time Stock Tracking'}</h3>
-                  <input type="text" placeholder="Search items..." style={{ padding: '8px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, width: 250 }} />
-                </div>
-
-                {subTab === 'production' ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                    <div style={{ background: theme.bg, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                      <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>Bill of Materials (Recipe)</h4>
-                      <div style={{ marginBottom: 16 }}>
-                        <label style={{ display: 'block', fontSize: '0.85rem', color: theme.muted, marginBottom: 6 }}>Finished Good Target</label>
-                        <select style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }}>
-                          <option>Mighty Burger (Target: 1 Portion)</option>
-                          <option>Chocolate Cake (Target: 10 Slices)</option>
-                        </select>
-                      </div>
-                      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', marginBottom: 16 }}>
-                        <thead><tr><th style={{ padding: '8px', color: theme.muted }}>Raw Material</th><th style={{ padding: '8px', color: theme.muted }}>Qty</th><th style={{ padding: '8px', color: theme.muted }}>Unit</th></tr></thead>
-                        <tbody>
-                          <tr style={{ borderTop: `1px solid ${theme.border}` }}><td style={{ padding: '8px', color: theme.text }}>Burger Bun</td><td style={{ padding: '8px', color: theme.text }}>2</td><td style={{ padding: '8px', color: theme.muted }}>pcs</td></tr>
-                          <tr style={{ borderTop: `1px solid ${theme.border}` }}><td style={{ padding: '8px', color: theme.text }}>Beef Patty Tracker</td><td style={{ padding: '8px', color: theme.text }}>150</td><td style={{ padding: '8px', color: theme.muted }}>gm</td></tr>
-                          <tr style={{ borderTop: `1px solid ${theme.border}` }}><td style={{ padding: '8px', color: theme.text }}>Lettuce + Sauce</td><td style={{ padding: '8px', color: theme.text }}>20</td><td style={{ padding: '8px', color: theme.muted }}>gm</td></tr>
-                        </tbody>
-                      </table>
-                      <button style={{ ...actBtn, width: '100%', justifyContent: 'center' }}><Plus size={16} /> Add Raw Material</button>
-                    </div>
-                    <div style={{ background: theme.bg, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                      <h4 style={{ margin: '0 0 16px 0', color: theme.text }}>Batch Production Run</h4>
-                      <p style={{ fontSize: '0.85rem', color: theme.muted, marginBottom: 16 }}>Execute production to automatically deduct raw materials (BOM) and yield Finished Goods in stock.</p>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                        <div><label style={{ fontSize: '0.8rem', color: theme.muted, display: 'block' }}>Target Quantity</label><input type="number" defaultValue={10} style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} /></div>
-                        <div><label style={{ fontSize: '0.8rem', color: theme.muted, display: 'block' }}>Yield % / Wastage</label><input type="text" defaultValue="98%" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} /></div>
-                      </div>
-                      <button style={{ ...actBtn, background: '#39FF14', color: '#000', width: '100%', justifyContent: 'center' }}><Workflow size={16} /> Execute Batch Production</button>
-                    </div>
-                  </div>
-                ) : (
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                    <thead style={theadBg}>
-                      <tr><th style={{ padding: '16px' }}>Item Code</th><th style={{ padding: '16px' }}>Name</th><th style={{ padding: '16px' }}>Category</th><th style={{ padding: '16px' }}>System Qty</th><th style={{ padding: '16px' }}>UOM</th><th style={{ padding: '16px' }}>Value (Rs)</th></tr>
-                    </thead>
-                    <tbody>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.text }}>RW-102</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Beef Patty Grade A</td><td style={{ padding: '16px', color: theme.muted }}>Raw Material</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>45.5</td><td style={{ padding: '16px', color: theme.muted }}>kg</td><td style={{ padding: '16px', color: theme.text }}>54,600</td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.text }}>FG-001</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Mighty Burger</td><td style={{ padding: '16px', color: theme.muted }}>Finished Good</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>12</td><td style={{ padding: '16px', color: theme.muted }}>pcs</td><td style={{ padding: '16px', color: theme.text }}>9,000</td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.text }}>PK-055</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Burger Box Standard</td><td style={{ padding: '16px', color: theme.muted }}>Packaging</td><td style={{ padding: '16px', fontWeight: 800, color: '#ef4444' }}>14</td><td style={{ padding: '16px', color: theme.muted }}>pcs</td><td style={{ padding: '16px', color: theme.text }}>210</td></tr>
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
+            <InventoryERP vendor={vendor} theme={theme} />
           )}
 
           {/* CLOUD ACCOUNTING ERP */}
@@ -1784,7 +1725,7 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 24 }}>
                 {(currentUser?.role === 'SUPER_ADMIN' 
                   ? ['Restaurant', 'Shops', 'Deliveryman', 'Banners', 'Brands', 'Blogs', 'Categories', 'Coupons', 'Products'] 
-                  : ['Categories', 'Products']
+                  : ['Categories']
                 ).map(folder => (
                   <div key={folder} style={{ 
                     background: theme.card, borderRadius: 24, padding: 32, border: `1px solid ${theme.border}`, 

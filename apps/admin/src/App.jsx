@@ -26,6 +26,8 @@ import SettingsPage from './components/SettingsPage.jsx';
 import InvoicesPage from './components/InvoicesPage.jsx';
 import ProfileModal from './components/ProfileModal.jsx';
 import HRPage from './components/HRPage.jsx';
+import CategoriesPage from './components/CategoriesPage.jsx';
+import OutletsPage from './components/OutletsPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
 export const headers = () => ({
@@ -36,58 +38,58 @@ export const headers = () => ({
 // ─── NAV CONFIG ────────────────────────────────────────────────────────────
 const NAV = [
   { section: 'Main' },
-  { id: 'dashboard',    label: 'Dashboard',        icon: LayoutDashboard },
-  { id: 'orders',       label: 'Orders',           icon: ShoppingCart,  badge: 'Live' },
-  { id: 'pos',          label: 'POS Terminal',     icon: Receipt },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'orders', label: 'Orders', icon: ShoppingCart, badge: 'Live' },
+  { id: 'pos', label: 'POS Terminal', icon: Receipt },
   { section: 'Catalog' },
-  { id: 'products',     label: 'Products',         icon: Package },
-  { id: 'categories',   label: 'Categories',       icon: Layers },
-  { id: 'inventory',    label: 'Inventory',        icon: Factory },
+  { id: 'products', label: 'Products', icon: Package },
+  { id: 'categories', label: 'Categories', icon: Layers },
+  { id: 'inventory', label: 'Inventory', icon: Factory },
   { section: 'People' },
-  { id: 'users',        label: 'Users & Roles',    icon: Users },
-  { id: 'vendors',      label: 'Vendors',          icon: Store },
-  { id: 'riders',       label: 'Riders',           icon: Bike },
-  { id: 'customers',    label: 'Customers',        icon: UserCog },
+  { id: 'users', label: 'Users & Roles', icon: Users },
+  { id: 'vendors', label: 'Vendors', icon: Store },
+  { id: 'riders', label: 'Riders', icon: Bike },
+  { id: 'customers', label: 'Customers', icon: UserCog },
   { section: 'Operations' },
-  { id: 'outlets',      label: 'Outlets & Tables', icon: MapPin },
-  { id: 'kds',          label: 'Kitchen (KDS)',    icon: ChefHat },
-  { id: 'delivery',     label: 'Delivery Zones',   icon: Truck },
+  { id: 'outlets', label: 'Outlets & Tables', icon: MapPin },
+  { id: 'kds', label: 'Kitchen (KDS)', icon: ChefHat },
+  { id: 'delivery', label: 'Delivery Zones', icon: Truck },
   { section: 'Finance' },
-  { id: 'reports',      label: 'Reports',          icon: BarChart3 },
-  { id: 'invoices',     label: 'Invoices',         icon: FileText },
-  { id: 'finance',      label: 'Payments',         icon: CreditCard },
-  { id: 'commissions',  label: 'Commissions',      icon: Percent },
-  { id: 'wallets',      label: 'Wallets',          icon: Wallet },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'invoices', label: 'Invoices', icon: FileText },
+  { id: 'finance', label: 'Payments', icon: CreditCard },
+  { id: 'commissions', label: 'Commissions', icon: Percent },
+  { id: 'wallets', label: 'Wallets', icon: Wallet },
   { section: 'B2B & ERP' },
-  { id: 'b2b',          label: 'B2B Portal',       icon: Briefcase },
-  { id: 'hr',           label: 'HR & Staff',       icon: Users2 },
+  { id: 'b2b', label: 'B2B Portal', icon: Briefcase },
+  { id: 'hr', label: 'HR & Staff', icon: Users2 },
   { section: 'Marketing' },
-  { id: 'coupons',      label: 'Coupons',          icon: Tag },
-  { id: 'banners',      label: 'Banners',          icon: Image },
-  { id: 'gallery',      label: 'Media Gallery',    icon: Image, badge: 'New' },
-  { id: 'notifications', label: 'Notifications',  icon: Bell },
+  { id: 'coupons', label: 'Coupons', icon: Tag },
+  { id: 'banners', label: 'Banners', icon: Image },
+  { id: 'gallery', label: 'Media Gallery', icon: Image, badge: 'New' },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
   { section: 'Content' },
-  { id: 'blog',         label: 'Blog / CMS',       icon: BookOpen },
-  { id: 'faqs',         label: 'FAQs',             icon: HelpCircle },
+  { id: 'blog', label: 'Blog / CMS', icon: BookOpen },
+  { id: 'faqs', label: 'FAQs', icon: HelpCircle },
   { section: 'System' },
-  { id: 'tenants',      label: 'Tenants',          icon: Building },
-  { id: 'leads',        label: 'Leads',            icon: UserPlus },
-  { id: 'settings',     label: 'Settings',         icon: Settings },
-  { id: 'api_keys',     label: 'API Keys',         icon: Key },
-  { id: 'printers',     label: 'Printers',         icon: Printer },
+  { id: 'tenants', label: 'Tenants', icon: Building },
+  { id: 'leads', label: 'Leads', icon: UserPlus },
+  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'api_keys', label: 'API Keys', icon: Key },
+  { id: 'printers', label: 'Printers', icon: Printer },
 ];
 
 const PAGE_TITLES = {
-  dashboard:'Dashboard', orders:'Order Management', pos:'POS Terminal',
-  products:'Products', categories:'Categories', inventory:'Inventory',
-  users:'Users & Roles', vendors:'Vendor Management', riders:'Rider Management',
-  customers:'Customer Management', outlets:'Outlets & Tables', kds:'Kitchen Display',
-  delivery:'Delivery Zones', reports:'Reports & Analytics', invoices:'Invoices',
-  finance:'Payments & Payouts', commissions:'Commissions', wallets:'Wallets & Ledger',
-  b2b:'B2B Portal', hr:'HR & Staff', coupons:'Coupons', banners:'Banners',
-  notifications:'Notifications', blog:'Blog / CMS', faqs:'FAQs',
-  tenants:'Tenant Management', leads:'Leads', gallery:'Media Gallery (Cloud)',
-  settings:'Settings', api_keys:'API Keys', printers:'Printers',
+  dashboard: 'Dashboard', orders: 'Order Management', pos: 'POS Terminal',
+  products: 'Products', categories: 'Categories', inventory: 'Inventory',
+  users: 'Users & Roles', vendors: 'Vendor Management', riders: 'Rider Management',
+  customers: 'Customer Management', outlets: 'Outlets & Tables', kds: 'Kitchen Display',
+  delivery: 'Delivery Zones', reports: 'Reports & Analytics', invoices: 'Invoices',
+  finance: 'Payments & Payouts', commissions: 'Commissions', wallets: 'Wallets & Ledger',
+  b2b: 'B2B Portal', hr: 'HR & Staff', coupons: 'Coupons', banners: 'Banners',
+  notifications: 'Notifications', blog: 'Blog / CMS', faqs: 'FAQs',
+  tenants: 'Tenant Management', leads: 'Leads', gallery: 'Media Gallery (Cloud)',
+  settings: 'Settings', api_keys: 'API Keys', printers: 'Printers',
 };
 
 // ─── GENERIC PLACEHOLDER ────────────────────────────────────────────────────
@@ -97,9 +99,9 @@ function GenericPage({ icon: Icon, title, subtitle }) {
       <div className="section-header">
         <div className="section-title"><Icon size={20} />{title}</div>
       </div>
-      <div className="glass-card" style={{ textAlign:'center', padding:56 }}>
-        <Icon size={44} color="var(--text-light)" style={{ marginBottom:14 }} />
-        <h3 style={{ marginBottom:6, color:'var(--text-main)' }}>{title}</h3>
+      <div className="glass-card" style={{ textAlign: 'center', padding: 56 }}>
+        <Icon size={44} color="var(--text-light)" style={{ marginBottom: 14 }} />
+        <h3 style={{ marginBottom: 6, color: 'var(--text-main)' }}>{title}</h3>
         <p className="text-muted text-sm">{subtitle || 'Connected to API — data will appear here.'}</p>
       </div>
     </div>
@@ -115,9 +117,9 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); 
+    e.preventDefault();
     if (!email || !password) return setError('Credentials required');
-    setError(''); 
+    setError('');
     setLoading(true);
     try {
       const res = await fetch(`${API}/api/auth/login`, {
@@ -127,7 +129,7 @@ function LoginScreen({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
-      
+
       if (data.user.role !== 'SUPER_ADMIN') {
         throw new Error('Unauthorized role for Admin Panel');
       }
@@ -141,26 +143,26 @@ function LoginScreen({ onLogin }) {
   };
 
   return (
-    <div className="login-page" style={{ 
+    <div className="login-page" style={{
       background: 'radial-gradient(circle at top left, #1e1b4b, #000000)',
       height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center'
     }}>
-      <div className="login-container glass-card" style={{ 
+      <div className="login-container glass-card" style={{
         width: 400, padding: 40, borderRadius: 24, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
         border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(2, 8, 23, 0.7)', backdropFilter: 'blur(12px)'
       }}>
         <div className="login-brand" style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div className="login-brand-icon" style={{ 
-            fontSize: '3rem', marginBottom: 12, 
-            background: 'linear-gradient(45deg, #39FF14, #8de02c)', 
+          <div className="login-brand-icon" style={{
+            fontSize: '3rem', marginBottom: 12,
+            background: 'linear-gradient(45deg, #39FF14, #8de02c)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
           }}>⚡</div>
           <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>Partner Panel</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: '0.9rem' }}>partner.galaxyexpress.pk</p>
         </div>
 
-        {error && <div className="login-error" style={{ 
-          padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', 
+        {error && <div className="login-error" style={{
+          padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
           borderRadius: 12, border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: 24,
           fontSize: '0.85rem', fontWeight: 600, textAlign: 'center'
         }}>{error}</div>}
@@ -169,8 +171,8 @@ function LoginScreen({ onLogin }) {
           <div className="form-group" style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Email Address</label>
             <input className="form-input" type="email" placeholder="admin@galaxyexpress.pk"
-              style={{ 
-                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', 
+              style={{
+                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.95rem'
               }}
               value={email} onChange={e => setEmail(e.target.value)} required />
@@ -178,8 +180,8 @@ function LoginScreen({ onLogin }) {
           <div className="form-group" style={{ marginBottom: 32 }}>
             <label style={{ display: 'block', color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Password</label>
             <input className="form-input" type="password" placeholder="••••••••"
-              style={{ 
-                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', 
+              style={{
+                width: '100%', padding: '14px 16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.95rem'
               }}
               value={password} onChange={e => setPassword(e.target.value)} required />
@@ -209,8 +211,8 @@ function AdminDashboard({ user, onLogout }) {
   const [searchGlobal, setSearchGlobal] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const [data, setData] = useState({
-    tenants:[], leads:[], users:[], orders:[], products:[],
-    stats:{ totalTenants:0, totalUsers:0, totalOrders:0, totalRevenue:0 }
+    tenants: [], leads: [], users: [], orders: [], products: [],
+    stats: { totalTenants: 0, totalUsers: 0, totalOrders: 0, totalRevenue: 0 }
   });
 
   // Theme toggle
@@ -228,12 +230,12 @@ function AdminDashboard({ user, onLogout }) {
       safe('/api/tenant/stats'), safe('/api/pos/orders'), safe('/api/products')
     ]);
     setData(prev => ({
-      tenants:  Array.isArray(t) ? t : prev.tenants,
-      leads:    Array.isArray(l) ? l : prev.leads,
-      users:    Array.isArray(u) ? u : prev.users,
-      orders:   Array.isArray(o) ? o : prev.orders,
+      tenants: Array.isArray(t) ? t : prev.tenants,
+      leads: Array.isArray(l) ? l : prev.leads,
+      users: Array.isArray(u) ? u : prev.users,
+      orders: Array.isArray(o) ? o : prev.orders,
       products: Array.isArray(p) ? p : prev.products,
-      stats:    (s && s.totalTenants !== undefined) ? s : prev.stats,
+      stats: (s && s.totalTenants !== undefined) ? s : prev.stats,
     }));
   }, []);
 
@@ -248,38 +250,38 @@ function AdminDashboard({ user, onLogout }) {
   const navigate = (id) => { setPage(id); setSidebarOpen(false); };
 
   const renderPage = () => {
-    switch(page) {
-      case 'dashboard':   return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
-      case 'orders':      return <OrdersPage orders={data.orders} onRefresh={loadData} />;
-      case 'pos':         return <POSTerminal products={data.products} onRefresh={loadData} />;
-      case 'products':    return <ProductsPage products={data.products} onRefresh={loadData} />;
-      case 'kds':         return <KdsScreen orders={data.orders} onRefresh={loadData} />;
-      case 'vendors':     return <VendorsPage />;
-      case 'riders':      return <RidersPage />;
-      case 'inventory':   return <InventoryPage products={data.products} />;
-      case 'reports':     return <ReportsPage stats={data.stats} orders={data.orders} />;
-      case 'invoices':    return <InvoicesPage />;
+    switch (page) {
+      case 'dashboard': return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
+      case 'orders': return <OrdersPage orders={data.orders} onRefresh={loadData} />;
+      case 'pos': return <POSTerminal products={data.products} onRefresh={loadData} />;
+      case 'products': return <ProductsPage products={data.products} onRefresh={loadData} />;
+      case 'kds': return <KdsScreen orders={data.orders} onRefresh={loadData} />;
+      case 'vendors': return <VendorsPage />;
+      case 'riders': return <RidersPage />;
+      case 'inventory': return <InventoryPage products={data.products} />;
+      case 'reports': return <ReportsPage stats={data.stats} orders={data.orders} />;
+      case 'invoices': return <InvoicesPage />;
       case 'wallets':
-      case 'finance':     return <WalletsPage />;
+      case 'finance': return <WalletsPage />;
       case 'commissions': return <WalletsPage />;
-      case 'b2b':         return <B2BPage />;
-      case 'customers':   return <CustomersPage />;
-      case 'users':       return <UsersPage users={data.users} onRefresh={loadData} />;
-      case 'tenants':     return <TenantsPage tenants={data.tenants} onRefresh={loadData} />;
-      case 'settings':    return <SettingsPage />;
-      case 'categories':  return <GenericPage icon={Layers} title="Categories" subtitle="Manage product categories & subcategories" />;
-      case 'outlets':     return <GenericPage icon={MapPin} title="Outlets & Tables" subtitle="Manage outlets, tables and QR codes" />;
-      case 'delivery':    return <GenericPage icon={Truck} title="Delivery Zones" subtitle="Create map-based delivery zones" />;
-      case 'coupons':     return <GenericPage icon={Tag} title="Coupons" subtitle="Create discount codes and offers" />;
-      case 'banners':     return <GenericPage icon={Image} title="Banners" subtitle="Manage marketing banners" />;
+      case 'b2b': return <B2BPage />;
+      case 'customers': return <CustomersPage />;
+      case 'users': return <UsersPage users={data.users} onRefresh={loadData} />;
+      case 'tenants': return <TenantsPage tenants={data.tenants} onRefresh={loadData} />;
+      case 'settings': return <SettingsPage />;
+      case 'categories': return <CategoriesPage />;
+      case 'outlets': return <OutletsPage />;
+      case 'delivery': return <GenericPage icon={Truck} title="Delivery Zones" subtitle="Create map-based delivery zones" />;
+      case 'coupons': return <GenericPage icon={Tag} title="Coupons" subtitle="Create discount codes and offers" />;
+      case 'banners': return <GenericPage icon={Image} title="Banners" subtitle="Manage marketing banners" />;
       case 'notifications': return <GenericPage icon={Bell} title="Notifications" subtitle="Push notifications to users" />;
-      case 'blog':        return <GenericPage icon={BookOpen} title="Blog / CMS" subtitle="Manage content pages" />;
-      case 'faqs':        return <GenericPage icon={HelpCircle} title="FAQs" subtitle="Manage FAQ entries" />;
-      case 'hr':          return <HRPage />;
-      case 'api_keys':    return <GenericPage icon={Key} title="API Keys" subtitle="Manage Google, Firebase, Stripe keys" />;
-      case 'printers':    return <GenericPage icon={Printer} title="Printers" subtitle="Configure thermal and A4 printers" />;
-      case 'leads':       return <GenericPage icon={UserPlus} title="Lead Management" subtitle="Incoming vendor/tenant leads" />;
-      case 'gallery':     return (
+      case 'blog': return <GenericPage icon={BookOpen} title="Blog / CMS" subtitle="Manage content pages" />;
+      case 'faqs': return <GenericPage icon={HelpCircle} title="FAQs" subtitle="Manage FAQ entries" />;
+      case 'hr': return <HRPage />;
+      case 'api_keys': return <GenericPage icon={Key} title="API Keys" subtitle="Manage Google, Firebase, Stripe keys" />;
+      case 'printers': return <GenericPage icon={Printer} title="Printers" subtitle="Configure thermal and A4 printers" />;
+      case 'leads': return <GenericPage icon={UserPlus} title="Lead Management" subtitle="Incoming vendor/tenant leads" />;
+      case 'gallery': return (
         <div style={{ padding: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
@@ -299,11 +301,11 @@ function AdminDashboard({ user, onLogout }) {
           </div>
         </div>
       );
-      default:            return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
+      default: return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
     }
   };
 
-  const initials = user.name ? user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : 'AD';
+  const initials = user.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'AD';
 
   return (
     <div className="admin-layout">
@@ -416,12 +418,15 @@ export default function App() {
     const savedUser = localStorage.getItem('erp_user');
     if (token && savedUser) {
       try {
-        // Support both real JWT and demo token
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          const notExpired = !payload.exp || payload.exp * 1000 > Date.now();
-          if (notExpired) { setUser(JSON.parse(savedUser)); setAuthed(true); return; }
+        const u = JSON.parse(savedUser);
+        // Force re-validation of role against the latest production baseline
+        if (u.role === 'SUPER_ADMIN' && u.email === 'admin@galaxyexpress.pk') {
+          setUser(u);
+          setAuthed(true);
+        } else {
+          // Wipe old/insecure sessions
+          localStorage.removeItem('erp_token');
+          localStorage.removeItem('erp_user');
         }
       } catch { /* ignore */ }
     }

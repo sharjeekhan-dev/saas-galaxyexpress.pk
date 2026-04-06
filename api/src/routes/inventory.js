@@ -4,82 +4,255 @@ import { z } from 'zod';
 
 const router = express.Router();
 
-// GET /api/inventory/stock — list all stock for tenant
-router.get('/stock', requireAuth, requireTenant, async (req, res) => {
-  try {
-    const { outletId } = req.query;
-    const where = { outlet: { tenantId: req.user.tenantId } };
+// =============================================
+// HELPERS
+// =============================================
+
+async function logAudit(prisma, tenantId, userId, username, actionType, entityId, productId, beforeQty, afterQty, changeQty, locationType, locationId, details) {
+    return prisma.inventoryAuditTrail.create({
+        data: {
+            tenantId, userId, username, actionType, entityId, productId,
+            beforeQty, afterQty, changeQty, locationType, locationId, details
+        }
+    });
+}
+
+// Ensure stock record exists for given product/outlet or product/department
+async function ensureStock(prisma, tenantId, productId, outletId = null, departmentId = null) {
+    const where = { productId };
     if (outletId) where.outletId = outletId;
+    if (departmentId) where.departmentId = departmentId;
 
-    const stock = await req.prisma.stock.findMany({
-      where,
-      include: { product: true, outlet: true, transactions: { take: 5, orderBy: { createdAt: 'desc' } } }
-    });
-    res.json(stock);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    let stock = await prisma.stock.findFirst({ where });
+    if (!stock) {
+        stock = await prisma.stock.create({
+            data: { productId, outletId, departmentId, quantity: 0 }
+        });
+    }
+    return stock;
+}
+
+// =============================================
+// PURCHASE INVOICE (VENDOR -> STORE)
+// =============================================
+
+// POST /api/inventory/purchase-invoices — Create Pending
+router.post('/purchase-invoices', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const schema = z.object({
+            vendorId: z.string().uuid(),
+            storeId: z.string().uuid(),
+            notes: z.string().optional(),
+            lines: z.array(z.object({
+                productId: z.string().uuid(),
+                quantity: z.number().positive(),
+                rate: z.number().nonnegative(),
+            })).min(1),
+        });
+
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ error: 'Invalid data', details: parsed.error.flatten() });
+
+        const { vendorId, storeId, notes, lines } = parsed.data;
+
+        // Calculate totals
+        const processedLines = lines.map(l => ({ ...l, total: l.quantity * l.rate }));
+        const totalAmount = processedLines.reduce((sum, l) => sum + l.total, 0);
+
+        const invite = await req.prisma.purchaseInvoice.create({
+            data: {
+                tenantId: req.user.tenantId,
+                invoiceNumber: `INV-${Date.now()}`,
+                vendorId,
+                storeId,
+                notes,
+                status: 'PENDING',
+                totalAmount,
+                netAmount: totalAmount,
+                lines: { create: processedLines }
+            },
+            include: { lines: true }
+        });
+
+        res.json(invite);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// GET /api/inventory/alerts — low stock alerts
-router.get('/alerts', requireAuth, requireTenant, async (req, res) => {
-  try {
-    const alerts = await req.prisma.$queryRaw`
-      SELECT s.id, s.quantity, s."lowThreshold", p.name, p.sku, o.name as "outletName"
-      FROM "Stock" s
-      JOIN "Product" p ON s."productId" = p.id
-      JOIN "Outlet" o ON s."outletId" = o.id
-      WHERE o."tenantId" = ${req.user.tenantId}
-      AND s.quantity <= s."lowThreshold"
-      AND s."lowThreshold" > 0
-    `;
-    res.json(alerts);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// GET /api/inventory/purchase-invoices — List
+router.get('/purchase-invoices', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const invoices = await req.prisma.purchaseInvoice.findMany({
+            where: { tenantId: req.user.tenantId },
+            include: { vendor: true, store: true, lines: { include: { product: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(invoices);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// POST /api/inventory/transaction — stock in/out/wastage/adjustment
-router.post('/transaction', requireAuth, requireTenant, async (req, res) => {
-  try {
-    const schema = z.object({
-      stockId: z.string().uuid(),
-      type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'WASTAGE', 'PRODUCTION']),
-      quantity: z.number().positive(),
-      reason: z.string().optional(),
-      batchNumber: z.string().optional(),
-      expiryDate: z.string().datetime().optional(),
-    });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+// PATCH /api/inventory/purchase-invoices/:id/approve
+router.patch('/purchase-invoices/:id/approve', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN', 'VENDOR']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const invoice = await req.prisma.purchaseInvoice.findFirst({
+            where: { id, tenantId: req.user.tenantId, status: 'PENDING' },
+            include: { lines: true }
+        });
 
-    const { stockId, type, quantity, reason, batchNumber, expiryDate } = parsed.data;
+        if (!invoice) return res.status(404).json({ error: 'Pending invoice not found' });
 
-    // Verify stock belongs to tenant
-    const stock = await req.prisma.stock.findFirst({
-      where: { id: stockId, outlet: { tenantId: req.user.tenantId } }
-    });
-    if (!stock) return res.status(404).json({ error: 'Stock record not found' });
+        await req.prisma.$transaction(async (tx) => {
+            // Update Status
+            await tx.purchaseInvoice.update({
+                where: { id },
+                data: { status: 'APPROVED', approvedBy: req.user.name }
+            });
 
-    const delta = (type === 'IN') ? quantity : -quantity;
+            // Update Stock
+            for (const line of invoice.lines) {
+                const stock = await ensureStock(tx, req.user.tenantId, line.productId, invoice.storeId, null);
+                const beforeQty = stock.quantity;
+                const afterQty = beforeQty + line.quantity;
 
-    const [tx] = await req.prisma.$transaction([
-      req.prisma.inventoryTransaction.create({
-        data: { stockId, type, quantity, reason, batchNumber, expiryDate: expiryDate ? new Date(expiryDate) : null }
-      }),
-      req.prisma.stock.update({
-        where: { id: stockId },
-        data: { quantity: { increment: delta } }
-      })
-    ]);
+                await tx.stock.update({
+                    where: { id: stock.id },
+                    data: { quantity: afterQty }
+                });
 
-    // Emit stock update event
-    req.io.to(`tenant_${req.user.tenantId}`).emit('stock_updated', { stockId, delta });
+                // Audit Log
+                await logAudit(tx, req.user.tenantId, req.user.id, req.user.name, 'PURCHASE', invoice.id, line.productId, beforeQty, afterQty, line.quantity, 'STORE', invoice.storeId, `Received from ${invoice.vendorId}`);
+            }
+        });
 
-    res.json(tx);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+        res.json({ message: 'Purchase Invoice Approved & Stock Updated' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================
+// STOCK ISSUANCE (STORE -> DEPT)
+// =============================================
+
+// POST /api/inventory/issuances
+router.post('/issuances', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const schema = z.object({
+            storeId: z.string().uuid(),
+            departmentId: z.string().uuid(),
+            notes: z.string().optional(),
+            lines: z.array(z.object({
+                productId: z.string().uuid(),
+                quantity: z.number().positive(),
+            })).min(1),
+        });
+
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ error: 'Invalid data', details: parsed.error.flatten() });
+
+        const issuance = await req.prisma.stockIssuance.create({
+            data: {
+                tenantId: req.user.tenantId,
+                storeId: parsed.data.storeId,
+                departmentId: parsed.data.departmentId,
+                notes: parsed.data.notes,
+                status: 'PENDING',
+                lines: { create: parsed.data.lines }
+            }
+        });
+
+        res.json(issuance);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/inventory/issuances/:id/approve
+router.patch('/issuances/:id/approve', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const issuance = await req.prisma.stockIssuance.findFirst({
+            where: { id, tenantId: req.user.tenantId, status: 'PENDING' },
+            include: { lines: true }
+        });
+
+        if (!issuance) return res.status(404).json({ error: 'Pending issuance not found' });
+
+        await req.prisma.$transaction(async (tx) => {
+            // Update Status
+            await tx.stockIssuance.update({
+                where: { id },
+                data: { status: 'APPROVED', approvedBy: req.user.name }
+            });
+
+            for (const line of issuance.lines) {
+                // Check Source Stock (Store)
+                const storeStock = await ensureStock(tx, req.user.tenantId, line.productId, issuance.storeId, null);
+                if (storeStock.quantity < line.quantity) throw new Error(`Insufficient stock for Product ${line.productId} in Store`);
+
+                const storeBefore = storeStock.quantity;
+                const storeAfter = storeBefore - line.quantity;
+
+                // Update Store Stock
+                await tx.stock.update({ where: { id: storeStock.id }, data: { quantity: storeAfter } });
+
+                // Check/Create Dept Stock
+                const deptStock = await ensureStock(tx, req.user.tenantId, line.productId, null, issuance.departmentId);
+                const deptBefore = deptStock.quantity;
+                const deptAfter = deptBefore + line.quantity;
+
+                // Update Dept Stock
+                await tx.stock.update({ where: { id: deptStock.id }, data: { quantity: deptAfter } });
+
+                // Logs
+                await logAudit(tx, req.user.tenantId, req.user.id, req.user.name, 'ISSUANCE_OUT', issuance.id, line.productId, storeBefore, storeAfter, -line.quantity, 'STORE', issuance.storeId, `Issued to Dept ${issuance.departmentId}`);
+                await logAudit(tx, req.user.tenantId, req.user.id, req.user.name, 'ISSUANCE_IN', issuance.id, line.productId, deptBefore, deptAfter, line.quantity, 'DEPARTMENT', issuance.departmentId, `Received from Store ${issuance.storeId}`);
+            }
+        });
+
+        res.json({ message: 'Stock Issuance Approved' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================
+// STOCK GENERAL QUERIES
+// =============================================
+
+router.get('/stock', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const { outletId, departmentId } = req.query;
+        const where = { product: { tenantId: req.user.tenantId } };
+        if (outletId) where.outletId = outletId;
+        if (departmentId) where.departmentId = departmentId;
+
+        const stock = await req.prisma.stock.findMany({
+            where,
+            include: { product: true, outlet: true, department: true }
+        });
+        res.json(stock);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/audit-logs', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const logs = await req.prisma.inventoryAuditTrail.findMany({
+            where: { tenantId: req.user.tenantId },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        });
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 export default router;
+
