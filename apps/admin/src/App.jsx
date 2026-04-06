@@ -298,6 +298,7 @@ function AdminDashboard({ user, onLogout }) {
       />
 
       {/* ── SIDEBAR ── */}
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <aside className={`sidebar ${sidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <div className="brand">
@@ -317,7 +318,7 @@ function AdminDashboard({ user, onLogout }) {
                 <div
                   key={n.id}
                   className={`nav-item ${page === n.id ? 'active' : ''}`}
-                  onClick={() => navigate(n.id)}
+                  onClick={() => { navigate(n.id); setSidebarOpen(false); }}
                 >
                   <n.icon size={16} />
                   {n.label}
@@ -342,7 +343,6 @@ function AdminDashboard({ user, onLogout }) {
       {/* ── TOPBAR ── */}
       <header className="topbar">
         <div className="topbar-left">
-          {/* Hamburger — visible only on mobile */}
           <button
             className="hamburger-btn"
             onClick={() => setSidebarOpen(o => !o)}
@@ -350,23 +350,33 @@ function AdminDashboard({ user, onLogout }) {
           >
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <h1 className="page-title">{PAGE_TITLES[page] || 'Dashboard'}</h1>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <span>Platform</span> <span style={{ opacity: 0.3 }}>/</span> 
+              <span>{page === 'dashboard' ? 'Admin' : 'Operations'}</span>
+            </div>
+            <h1 className="page-title" style={{ marginTop: -2 }}>{PAGE_TITLES[page] || 'Dashboard'}</h1>
+          </div>
         </div>
         <div className="topbar-right">
-          <input
-            className="search-global"
-            placeholder="Search…"
-            value={searchGlobal}
-            onChange={e => setSearchGlobal(e.target.value)}
-          />
-          <button className="topbar-btn" onClick={loadData} title="Refresh data">
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 12px' }}>
+            <Search size={14} color="var(--text-muted)" />
+            <input
+              className="search-global"
+              style={{ border: 'none', background: 'transparent', backgroundImage: 'none' }}
+              placeholder="Search data..."
+              value={searchGlobal}
+              onChange={e => setSearchGlobal(e.target.value)}
+            />
+          </div>
+          <button className="topbar-btn" onClick={loadData} title="Refresh Live Data">
             <RefreshCw size={16} />
           </button>
-          <button className="topbar-btn" title="Notifications">
+          <button className="topbar-btn" title="Pending Approvals & Notifications">
             <Bell size={16} />
             <span className="notif-dot" />
           </button>
-          <button className="topbar-btn" onClick={() => setIsDark(d => !d)} title="Toggle theme">
+          <button className="topbar-btn" onClick={() => setIsDark(d => !d)} title="Switch Perspective (Dark/Light)">
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>

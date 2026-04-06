@@ -565,83 +565,118 @@ export default function App() {
         <div style={{ position: 'fixed', top: 30, right: 30, background: '#39FF14', color: '#000', padding: '16px 24px', borderRadius: 12, fontWeight: 800, zIndex: 9999, boxShadow: '0 10px 30px rgba(57,255,20,0.3)', animation: 'floatIn 0.3s ease' }}>
           {toastMessage}
         </div>
+      )}      {/* SIDEBAR (Adaptive Drawer) */}
+      {(isMobile && mobileMenu) && (
+        <div 
+          onClick={() => setMobileMenu(false)} 
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 100, animation: 'fadeIn 0.2s' }} 
+        />
       )}
-
-      {/* SIDEBAR (DESKTOP) */}
-      {isMobile && mobileMenu && <div onClick={() => setMobileMenu(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }} />}
-      <aside style={{ width: 250, background: theme.navBg, borderRight: `1px solid ${theme.border}`, display: isMobile ? (mobileMenu ? 'flex' : 'none') : 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'relative', top: 0, left: 0, bottom: 0, zIndex: 50, boxShadow: isMobile ? '4px 0 20px rgba(0,0,0,0.3)' : 'none' }}>
-        <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 900, color: '#8de02c', fontSize: '1.2rem' }}>ERP Portal</div>
-            <div style={{ fontSize: '0.75rem', color: theme.muted, fontWeight: 700, textTransform: 'uppercase' }}>erp.galaxyexpress.pk</div>
+      <aside style={{ 
+        width: 280, background: theme.navBg, borderRight: `1px solid ${theme.border}`, 
+        display: isMobile ? (mobileMenu ? 'flex' : 'none') : 'flex', 
+        flexDirection: 'column', position: isMobile ? 'fixed' : 'relative', 
+        top: 0, left: 0, bottom: 0, zIndex: 101, 
+        boxShadow: isMobile ? '4px 0 30px rgba(0,0,0,0.4)' : 'none',
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: isMobile && !mobileMenu ? 'translateX(-100%)' : 'none'
+      }}>
+        <div style={{ padding: '24px 20px', borderBottom: `1px solid ${theme.border}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 42, height: 42, background: 'var(--gradient-primary)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 900, fontSize: '1.2rem', boxShadow: '0 0 15px rgba(141,224,44,0.3)' }}>GX</div>
+            <div>
+              <div style={{ fontWeight: 900, color: theme.text, fontSize: '1.1rem', letterSpacing: '-0.5px' }}>ERP Portal</div>
+              <div style={{ fontSize: '0.65rem', color: '#8de02c', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{vendor.slug || 'VENDOR'} NODE</div>
+            </div>
           </div>
-          {isMobile && <X onClick={() => setMobileMenu(false)} style={{ cursor: 'pointer' }} color={theme.text} />}
         </div>
 
-        <div style={{ padding: 20, flex: 1, overflowY: 'auto' }}>
-          {hasPerm('pos') && (
-            <div onClick={() => { setActiveTab('pos'); setMobileMenu(false); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12, marginBottom: 12, cursor: 'pointer',
-                background: activeTab === 'pos' ? '#39FF14' : 'rgba(57,255,20,0.1)',
-                color: activeTab === 'pos' ? '#000' : '#8de02c', fontWeight: 800, transition: '0.2s', boxShadow: activeTab === 'pos' ? '0 4px 14px rgba(57,255,20,0.3)' : 'none'
-              }}>
-              <Target size={20} /> Point of Sale (POS)
-            </div>
-          )}
-        <nav style={{ padding: '0 15px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1, marginTop: 10 }}>
+        <nav style={{ padding: '20px 14px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {[
-            { id: 'orders', label: 'Live Orders', icon: ShoppingCart },
+            { section: 'OPERATIONS' },
+            { id: 'orders', label: 'Live Pipeline', icon: ShoppingCart, badge: orders.filter(o => o.status === 'PENDING').length || null },
             { id: 'pos', label: 'POS Terminal', icon: Receipt },
+            { section: 'RECORDS' },
             { id: 'products', label: 'Menu Catalog', icon: Package },
-            { id: 'inventory', label: 'Inventory & ERP', icon: Layers },
-            { id: 'accounts', label: 'Finance & Ledger', icon: DollarSign },
+            { id: 'inventory', label: 'Inventory ERP', icon: Layers },
+            { id: 'accounts', label: 'Finance Hub', icon: DollarSign },
+            { section: 'SYSTEM' },
             { id: 'gallery', label: 'Media Gallery', icon: Image },
-            { id: 'reports', label: 'Business Reports', icon: BarChart3 },
-            { id: 'settings', label: 'Configurations', icon: Settings }
-          ].map(item => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileMenu(false); }} style={{
-              display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', borderRadius: 12, border: 'none',
-              background: activeTab === item.id ? '#39FF14' : 'transparent',
-              color: activeTab === item.id ? '#000' : theme.text,
-              cursor: 'pointer', fontWeight: 600, transition: '0.2s', textAlign: 'left'
-            }}>
-              <item.icon size={20} /> <span style={{ fontSize: '0.95rem' }}>{item.label}</span>
-              {item.id === 'orders' && orders.filter(o => o.status === 'new').length > 0 && (
-                <span style={{ marginLeft: 'auto', background: activeTab === 'orders' ? '#000' : '#39FF14', color: activeTab === 'orders' ? '#fff' : '#000', padding: '2px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 800 }}>{orders.filter(o => o.status === 'new').length}</span>
-              )}
-            </button>
+            { id: 'reports', label: 'Performance', icon: BarChart3 },
+            { id: 'settings', label: 'Configuration', icon: Settings }
+          ].map((item, i) => item.section ? (
+            <div key={i} style={{ fontSize: '0.68rem', color: theme.muted, fontWeight: 800, padding: '16px 12px 6px', textTransform: 'uppercase', letterSpacing: 1.5 }}>{item.section}</div>
+          ) : (
+            <div 
+              key={item.id} 
+              onClick={() => { setActiveTab(item.id); setMobileMenu(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
+                background: activeTab === item.id ? 'rgba(141,224,44,0.1)' : 'transparent',
+                color: activeTab === item.id ? '#8de02c' : theme.muted,
+                fontWeight: 700, fontSize: '0.88rem', transition: 'all 0.2s',
+                borderLeft: activeTab === item.id ? '4px solid #39FF14' : '4px solid transparent'
+              }}
+              onMouseOver={e => { if(activeTab !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+              onMouseOut={e => { if(activeTab !== item.id) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <item.icon size={18} color={activeTab === item.id ? '#39FF14' : 'currentColor'} /> 
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.badge && <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.6rem', padding: '2px 6px', borderRadius: 20, fontWeight: 900 }}>{item.badge}</span>}
+            </div>
           ))}
         </nav>
-        </div>
 
-        <div style={{ padding: 20, borderTop: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#ef4444', fontWeight: 600 }} onClick={() => setVendor(null)}>
-          <LogOut size={18} /> Logout
+        <div style={{ padding: 20, borderTop: `1px solid ${theme.border}` }}>
+          <div onClick={() => setVendor(null)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}>
+            <LogOut size={16} /> Sign Out Securely
+          </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', height: '100vh', overflow: 'hidden' }}>
-
-        <header style={{ background: theme.navBg, padding: '16px 24px', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* MAIN VIEWPORT */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', height: '100vh', overflow: 'hidden', background: theme.bg }}>
+        
+        <header style={{ 
+          background: theme.card, padding: '0 24px', height: 72, borderBottom: `1px solid ${theme.border}`, 
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 40,
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)'
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {isMobile && <Menu onClick={() => setMobileMenu(true)} style={{ cursor: 'pointer' }} color={theme.text} />}
-            <h1 style={{ fontSize: '1.2rem', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Store size={20} color="#8de02c" /> {vendor.name} <span style={{ fontSize: '0.75rem', background: theme.bg, padding: '4px 8px', borderRadius: 20 }}>ID: {vendor.id}</span>
-            </h1>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            {/* INSECURE USER SWITCHER REMOVED */}
-            <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: theme.text }}>
-              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <Bell size={20} color={theme.text} />
-              <div style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, background: '#ef4444', borderRadius: '50%' }}></div>
+            {isMobile && (
+              <button onClick={() => setMobileMenu(true)} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${theme.border}`, padding: 8, borderRadius: 10, cursor: 'pointer', display: 'flex' }}>
+                <Menu size={20} color={theme.text} />
+              </button>
+            )}
+            <div>
+               <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.68rem', color: theme.muted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                 <span>{vendor.name}</span> <span style={{ opacity: 0.3 }}>/</span> 
+                 <span style={{ color: '#8de02c' }}>{activeTab === 'pos' ? 'Terminal' : 'Operations'}</span>
+               </div>
+               <h1 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Dashboard
+               </h1>
             </div>
-            <button onClick={() => setVendor(null)} style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-              <LogOut size={16} /> Sign Out
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <button onClick={() => setDarkMode(!darkMode)} style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.03)', border: `1px solid ${theme.border}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: theme.text }}>
+              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+            <div style={{ width: 40, height: 40, background: 'rgba(255,255,255,0.03)', border: `1px solid ${theme.border}`, borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <Bell size={18} color={theme.text} />
+              <div style={{ position: 'absolute', top: 10, right: 10, width: 8, height: 8, background: '#39FF14', borderRadius: '50%', border: `2px solid ${theme.card}`, boxShadow: '0 0 8px rgba(57,255,20,0.5)' }}></div>
+            </div>
+            
+            <div style={{ height: 32, width: 1, background: theme.border, margin: '0 4px' }} />
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.03)', padding: '6px 14px', borderRadius: 14, border: `1px solid ${theme.border}` }}>
+               <div style={{ width: 32, height: 32, background: 'var(--gradient-primary)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#000', fontSize: '0.8rem' }}>VA</div>
+               <div style={{ display: isMobile ? 'none' : 'block' }}>
+                 <div style={{ fontSize: '0.8rem', fontWeight: 800, color: theme.text }}>Vendor Admin</div>
+                 <div style={{ fontSize: '0.6rem', color: theme.muted, fontWeight: 700 }}>VERIFIED SESSION</div>
+               </div>
+            </div>
           </div>
         </header>
 
@@ -1172,8 +1207,8 @@ export default function App() {
                 </div>
 
                 {/* Form Main Area */}
-                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', marginBottom: 20 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 30 }}>
+                <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: window.innerWidth < 768 ? 16 : 24, boxShadow: '0 4px 20px rgba(0,0,0,0.03)', marginBottom: 20 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: window.innerWidth < 1024 ? '1fr' : 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: window.innerWidth < 768 ? 20 : 30 }}>
 
                     {/* Left Columns of Entry details */}
                     <div>
