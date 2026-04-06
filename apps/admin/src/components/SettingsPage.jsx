@@ -6,6 +6,7 @@ const TABS = [
   { id:'theme',    label:'Theme & Colors',  icon:Moon },
   { id:'general',  label:'General',         icon:Settings },
   { id:'payments', label:'Payments',        icon:Shield },
+  { id:'apikeys',  label:'API & Integrations', icon:Key },
   { id:'trans',    label:'Translations',    icon:Globe },
   { id:'notif',    label:'Notifications',   icon:Bell },
   { id:'tax',      label:'Tax & Fees',      icon:Percent },
@@ -261,6 +262,46 @@ export default function SettingsPage() {
                 </div>
               ))}
               <button className="btn btn-primary mt-20" onClick={save}>Save Gateways</button>
+            </div>
+          )}
+
+          {tab==='apikeys' && (
+            <div className="fade-in">
+              <div className="flex justify-between items-center mb-20">
+                <h3 style={{margin:0}}>API & Integrations Console</h3>
+                <button className="btn btn-primary" onClick={save}><Save size={14}/> Save Configurations</button>
+              </div>
+              <p className="text-muted text-sm mb-20">Securely manage credentials for third-party SaaS integrations. These settings propagate globally.</p>
+
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(300px, 1fr))', gap:24}}>
+                <div style={{background:'var(--bg-input)', padding:20, borderRadius:12, border:'1px solid var(--border-color)'}}>
+                  <h4 style={{marginBottom:16, display:'flex', alignItems:'center', gap:8}}><Shield size={16} color="var(--accent-dark)"/> Firebase Auth / DB</h4>
+                  <div className="form-group mb-12"><label>API Key</label><input type="password" placeholder="AIzaSy..." className="form-input" /></div>
+                  <div className="form-group mb-12"><label>Auth Domain</label><input placeholder="project.firebaseapp.com" className="form-input" /></div>
+                  <div className="form-group mb-12"><label>Project ID</label><input placeholder="your-project-id" className="form-input" /></div>
+                </div>
+
+                <div style={{background:'var(--bg-input)', padding:20, borderRadius:12, border:'1px solid var(--border-color)'}}>
+                  <h4 style={{marginBottom:16, display:'flex', alignItems:'center', gap:8}}><MapPin size={16} color="var(--accent-dark)"/> Google Maps</h4>
+                  <div className="form-group mb-12"><label>JavaScript API Key</label><input type="password" placeholder="AIzaSy..." className="form-input" /></div>
+                  <div className="form-group mb-12"><label>Distance Matrix Key</label><input type="password" placeholder="AIzaSy..." className="form-input" /></div>
+                  <div className="text-xs text-muted">Required for Delivery Zones & Routing.</div>
+                </div>
+
+                <div style={{background:'var(--bg-input)', padding:20, borderRadius:12, border:'1px solid var(--border-color)'}}>
+                  <h4 style={{marginBottom:16, display:'flex', alignItems:'center', gap:8}}><MessageCircle size={16} color="var(--accent-dark)"/> WhatsApp Cloud API</h4>
+                  <div className="form-group mb-12"><label>Permanent Access Token</label><input type="password" placeholder="EAAI..." className="form-input" /></div>
+                  <div className="form-group mb-12"><label>Phone Number ID</label><input placeholder="1049..." className="form-input" /></div>
+                  <div className="form-group mb-12"><label>WABA ID</label><input placeholder="Business Account ID" className="form-input" /></div>
+                </div>
+
+                <div style={{background:'var(--bg-input)', padding:20, borderRadius:12, border:'1px solid var(--border-color)'}}>
+                  <h4 style={{marginBottom:16, display:'flex', alignItems:'center', gap:8}}><Globe size={16} color="var(--accent-dark)"/> Email SMTP (SendGrid)</h4>
+                  <div className="form-group mb-12"><label>SMTP Host</label><input defaultValue="smtp.sendgrid.net" className="form-input" /></div>
+                  <div className="form-group mb-12"><label>SMTP Port</label><input defaultValue="587" className="form-input" /></div>
+                  <div className="form-group mb-12"><label>API Key / Password</label><input type="password" placeholder="SG.xxxx" className="form-input" /></div>
+                </div>
+              </div>
             </div>
           )}
 

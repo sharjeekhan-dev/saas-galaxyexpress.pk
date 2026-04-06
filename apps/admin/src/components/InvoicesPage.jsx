@@ -32,20 +32,119 @@ const MOCK_INVOICES = [
 const BLANK_ITEM = { desc:'', qty:1, rate:0 };
 
 // ── Print Invoice HTML ────────────────────────────────────────────────────────────
-function buildPrintHTML(inv) {
-  const rows = inv.items.map(i=>`<tr><td>${i.desc}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">Rs ${Number(i.rate).toLocaleString()}</td><td style="text-align:right">Rs ${(i.qty*i.rate).toLocaleString()}</td></tr>`).join('');
-  return `<!DOCTYPE html><html><head><title>${inv.renamedTo||inv.id}</title>
-  <style>body{font-family:Arial,sans-serif;color:#111;margin:40px}h1{color:#6bb81f}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{padding:8px 12px;border-bottom:1px solid #eee}th{background:#f9f9f9;text-align:left}.total{font-size:1.3rem;font-weight:bold;color:#6bb81f}.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.75rem;font-weight:700;background:#d1fae5;color:#065f46}</style>
+function buildPrintHTML(inv, mode) {
+  const isThermal = mode === 'thermal';
+  const rows = inv.items.map(i=>`<tr><td>${i.desc}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${fmt(Number(i.rate))}</td><td style="text-align:right">${fmt(i.qty*i.rate)}</td></tr>`).join('');
+  
+  if (isThermal) {
+    return `<!DOCTYPE html><html><head><title>${inv.renamedTo||inv.id} - Receipt</title>
+    <style>
+      @page { margin: 0; }
+      body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 10px; width: 80mm; box-sizing: border-box; background: white; color: black; }
+      .center { text-align: center; }
+      h2 { margin: 5px 0; font-size: 16px; }
+      .divider { border-top: 1px dashed #000; margin: 10px 0; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+      th, td { text-align: left; padding: 4px 0; }
+      .right { text-align: right; }
+      .bold { font-weight: bold; }
+    </style>
+    </head><body>
+      <div class="center">
+        <h2>★ GalaxyExpress ★</h2>
+        <div>NTN: 8234791-2</div>
+        <div>Tel: +92-300-1234567</div>
+        <div class="divider"></div>
+        <div>Receipt #: ${inv.renamedTo||inv.id}</div>
+        <div>Date: ${inv.issued}</div>
+        <div>Customer: ${inv.client}</div>
+      </div>
+      <div class="divider"></div>
+      <table>
+        <thead><tr><th>Item</th><th class="center">Qty</th><th class="right">Total</th></tr></thead>
+        <tbody>
+          ${inv.items.map(i=>`<tr><td>${i.desc}</td><td class="center">${i.qty}</td><td class="right">${fmt(i.qty*i.rate)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <table>
+        <tr><td>Subtotal</td><td class="right">${fmt(inv.subtotal)}</td></tr>
+        <tr><td>Tax (9%)</td><td class="right">${fmt(inv.tax)}</td></tr>
+        ${inv.discount ? `<tr><td>Discount</td><td class="right">-${fmt(inv.discount)}</td></tr>` : ''}
+        <tr><td class="bold">TOTAL DUE</td><td class="right bold" style="font-size:14px;">${fmt(inv.total)}</td></tr>
+      </table>
+      <div class="divider"></div>
+      <div class="center" style="margin-top:10px;">
+        <svg width="100" height="40" style="background:#eee; margin-bottom:5px;"></svg>
+        <div style="font-size:10px;">Thank you for your business!</div>
+        <div style="font-size:9px; margin-top:10px;">Powered by GalaxyERP</div>
+      </div>
+      <script>window.onload = function() { window.print(); }</script>
+    </body></html>`;
+  }
+
+  // A4 / PDF Format
+  return `<!DOCTYPE html><html><head><title>${inv.renamedTo||inv.id} - Tax Invoice</title>
+  <style>
+    body{font-family:'Segoe UI',sans-serif;color:#222;margin:40px; line-height: 1.5; background: #fff;}
+    .header { display: flex; justify-content: space-between; align-items:flex-start; margin-bottom: 40px; border-bottom:3px solid #39FF14; padding-bottom: 20px;}
+    .brand h1{color:#1E4023; margin:0; font-size: 32px; letter-spacing: -1px;}
+    .brand p { margin: 2px 0; color: #555; }
+    .inv-details th, .inv-details td { text-align: left; padding: 4px; }
+    .inv-details th { color: #888; font-weight: normal; }
+    .inv-details td { font-weight: bold; }
+    table.items{width:100%;border-collapse:collapse;margin:30px 0}
+    table.items th, table.items td{padding:12px 16px;border-bottom:1px solid #ddd; text-align:right;}
+    table.items th{background:#f4f4f4; color:#444; font-size: 13px; text-transform:uppercase;}
+    table.items th:first-child, table.items td:first-child { text-align:left; }
+    .total-box { width: 300px; margin-left: auto; border: 1px solid #eee; background: #fafafa; border-radius: 8px; padding: 20px; }
+    .total-line { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .super-total { font-size: 1.4rem; font-weight: 800; color: #1E4023; border-top: 2px solid #ddd; padding-top: 12px; margin-top: 12px;}
+    .badge{display:inline-block;padding:4px 12px;border-radius:4px;font-size:0.8rem;font-weight:bold;background:#d1fae5;color:#065f46;text-transform:uppercase;}
+    .footer { text-align: center; color: #888; font-size: 12px; margin-top: 80px; padding-top: 40px; border-top: 1px solid #eee; }
+  </style>
   </head><body>
-  <h1>GalaxyERP Invoice</h1>
-  <p><strong>Invoice #:</strong> ${inv.renamedTo||inv.id} &nbsp;&nbsp; <strong>Status:</strong> <span class="badge">${STATUS_MAP[inv.status].label}</span></p>
-  <p><strong>Client:</strong> ${inv.client} | ${inv.email}</p>
-  <p><strong>Issued:</strong> ${inv.issued} &nbsp;&nbsp; <strong>Due:</strong> ${inv.due}</p>
-  <table><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>
-  <p style="text-align:right">Subtotal: Rs ${Number(inv.subtotal).toLocaleString()}</p>
-  <p style="text-align:right">Tax (9%): Rs ${Number(inv.tax).toLocaleString()}</p>
-  ${inv.discount?`<p style="text-align:right">Discount: -Rs ${Number(inv.discount).toLocaleString()}</p>`:''}
-  <p style="text-align:right" class="total">Total Due: Rs ${Number(inv.total).toLocaleString()}</p>
+  <div class="header">
+    <div class="brand">
+      <h1>GalaxyExpress SaaS</h1>
+      <p>123 High Street, Business District</p>
+      <p>NTN: 8234791-2</p>
+      <p>Tel: +92 300 0000000</p>
+    </div>
+    <div>
+      <h2 style="margin:0 0 10px 0; font-size:36px; color:#ddd; text-transform:uppercase; text-align:right;">INVOICE</h2>
+      <table class="inv-details">
+        <tr><th>Invoice #</th><td>${inv.renamedTo||inv.id}</td></tr>
+        <tr><th>Date Issued</th><td>${inv.issued}</td></tr>
+        <tr><th>Due Date</th><td>${inv.due}</td></tr>
+        <tr><th>Status</th><td><span class="badge">${STATUS_MAP[inv.status].label}</span></td></tr>
+      </table>
+    </div>
+  </div>
+  
+  <div style="margin-bottom: 40px; background: #f9f9f9; padding: 20px; border-left: 4px solid #1E4023;">
+    <p style="margin:0 0 5px 0; color:#666; font-size: 13px; text-transform:uppercase;">Billed To</p>
+    <strong style="font-size: 18px;">${inv.client}</strong>
+    <p style="margin: 4px 0 0 0; color:#555;">${inv.email}</p>
+  </div>
+
+  <table class="items">
+    <thead><tr><th>Description</th><th style="text-align:center">Qty</th><th>Unit Rate</th><th>Total Amount</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="total-box">
+    <div class="total-line"><span>Subtotal:</span><span>${fmt(inv.subtotal)}</span></div>
+    <div class="total-line"><span>Tax (9%):</span><span>${fmt(inv.tax)}</span></div>
+    ${inv.discount ? `<div class="total-line"><span>Discount:</span><span style="color:#ef4444;">-${fmt(inv.discount)}</span></div>` : ''}
+    <div class="total-line super-total"><span>Total Due:</span><span>${fmt(inv.total)}</span></div>
+  </div>
+
+  <div class="footer">
+    Thank you for your business. Please remit payment by the due date. <br>
+    This is a system-generated PDF tax invoice.
+  </div>
+  <script>window.onload = function() { window.print(); }</script>
   </body></html>`;
 }
 
@@ -175,8 +274,14 @@ export default function InvoicesPage() {
     setContextMenu(null);
   };
 
-  const printInvoice = (inv) => {
-    const w = window.open('','_blank'); w.document.write(buildPrintHTML(inv)); w.document.close(); w.print();
+  const printInvoice = (inv, mode = 'a4') => {
+    const html = buildPrintHTML(inv, mode);
+    const winProps = mode === 'thermal' ? 'width=400,height=600' : '';
+    const w = window.open('', '_blank', winProps);
+    if (!w) return alert('Please allow popups to print invoices');
+    w.document.write(html);
+    w.document.close();
+    // window.print() is inside the generated HTML script tag
   };
 
   const downloadCSV = () => {
@@ -484,7 +589,8 @@ export default function InvoicesPage() {
                         <div style={ctxStyle} onClick={()=>duplicateInvoice(inv)}><Copy size={13}/> Duplicate</div>
                         <div style={ctxStyle} onClick={()=>openEdit(inv)}><Edit size={13}/> Edit Invoice</div>
                         <div style={ctxStyle} onClick={()=>{setShowRename(inv);setRenameVal(inv.renamedTo||'');setContextMenu(null);}}><Pencil size={13}/> Rename</div>
-                        <div style={ctxStyle} onClick={()=>printInvoice(inv)}><Printer size={13}/> Print Invoice</div>
+                        <div style={ctxStyle} onClick={()=>printInvoice(inv, 'a4')}><Printer size={13}/> Print A4 / Save PDF</div>
+                        <div style={ctxStyle} onClick={()=>printInvoice(inv, 'thermal')}><FileText size={13}/> Print Thermal (80mm)</div>
                         {inv.status!=='PAID' && <div style={{...ctxStyle,color:'var(--neon-green)'}} onClick={()=>markPaid(inv.id)}><Check size={13}/> Mark as Paid</div>}
                         <div style={{...ctxStyle,color:'var(--neon-red)',borderTop:'1px solid var(--border-color)',marginTop:4,paddingTop:8}} onClick={()=>softDelete(inv.id)}>
                           <Trash2 size={13}/> Move to Recycle Bin

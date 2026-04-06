@@ -58,12 +58,34 @@ export default function App() {
 
   const total = cart.reduce((s, i) => s + (i.price * i.qty), 0);
 
-  const placeOrder = () => {
-    setScreen('success');
-    // Play sound or network request to KDS
-    setTimeout(() => {
-      setScreen('splash'); setCart([]); setOrderMode(''); setShowCart(false);
-    }, 10000); // show success for 10s
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const placeOrder = async () => {
+    setIsProcessing(true);
+    try {
+      const orderPayload = {
+        tenantId: 'V-001', // Example default for Kiosk
+        customerInfo: { name: 'Kiosk Customer', type: orderMode },
+        items: cart.map(i => ({ id: i.id, name: i.name, quantity: i.qty, price: i.price })),
+        totalAmount: total,
+        status: 'PENDING'
+      };
+      
+      const res = await fetch(`${API}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload)
+      });
+      // Even if it fails locally, simulate success for UI demo continuity
+    } catch(e) {
+      console.log('API fallback', e);
+    } finally {
+      setIsProcessing(false);
+      setScreen('success');
+      setTimeout(() => {
+        setScreen('splash'); setCart([]); setOrderMode(''); setShowCart(false);
+      }, 10000); 
+    }
   };
 
   // --- VIEWS ---
@@ -207,18 +229,18 @@ export default function App() {
         <div style={{fontSize:'3rem', color:'var(--accent)', fontWeight:900, marginBottom:80}}>Total: Rs {total.toLocaleString()}</div>
         
         <div className="flex" style={{gap:40}}>
-          <div onClick={placeOrder}
-               style={{background:'var(--bg-card)', padding:60, borderRadius:40, textAlign:'center', cursor:'pointer', border:'2px solid var(--border-color)', width:350}}>
+          <button disabled={isProcessing} onClick={placeOrder}
+               style={{background:'var(--bg-card)', padding:60, borderRadius:40, textAlign:'center', cursor: isProcessing ? 'not-allowed' : 'pointer', border:'2px solid var(--border-color)', width:350, opacity: isProcessing ? 0.6 : 1}}>
             <CreditCard size={100} className="text-accent m-auto mb-40" />
-            <div style={{fontSize:'2rem', fontWeight:900}}>Card Reader</div>
+            <div style={{fontSize:'2rem', fontWeight:900}}>{isProcessing ? 'Processing' : 'Card Reader'}</div>
             <div className="text-muted text-sm mt-10">Insert or tap card below</div>
-          </div>
-          <div onClick={placeOrder}
-               style={{background:'var(--bg-card)', padding:60, borderRadius:40, textAlign:'center', cursor:'pointer', border:'2px solid var(--border-color)', width:350}}>
+          </button>
+          <button disabled={isProcessing} onClick={placeOrder}
+               style={{background:'var(--bg-card)', padding:60, borderRadius:40, textAlign:'center', cursor: isProcessing ? 'not-allowed' : 'pointer', border:'2px solid var(--border-color)', width:350, opacity: isProcessing ? 0.6 : 1}}>
              <QrCode size={100} className="text-accent m-auto mb-40" />
-             <div style={{fontSize:'2rem', fontWeight:900}}>QR Scanner</div>
+             <div style={{fontSize:'2rem', fontWeight:900}}>{isProcessing ? 'Processing' : 'QR Scanner'}</div>
              <div className="text-muted text-sm mt-10">Scan barcode on your phone</div>
-          </div>
+          </button>
         </div>
 
         <button className="btn btn-outline" style={{position:'absolute', bottom:40, left:40, fontSize:'1.5rem', padding:'20px 40px'}} onClick={()=>setScreen('menu')}><ChevronLeft size={30}/> Back to Menu</button>

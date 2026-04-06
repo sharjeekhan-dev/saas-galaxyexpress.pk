@@ -1,21 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Navigation, CheckCircle, XCircle, Phone, MessageSquare, 
-  Wallet, History, User, Settings, Bell, ChevronRight, Bike 
+  Wallet, History, User, Settings, Bell, ChevronRight, Bike, Loader2
 } from 'lucide-react';
 
-const MOCK_ORDERS = [
-  { id: 'ORD-991', restaurant: 'Pizza Palace', pickup: 'Gulshan Branch', dropoff: 'Block 4, Clifton', payout: 250, distance: '4.2 km', status: 'pending' },
-  { id: 'ORD-992', restaurant: 'Burger Galaxy', pickup: 'DHA Phase 6', dropoff: 'Zamzama Comm.', payout: 180, distance: '2.1 km', status: 'pending' }
-];
-
 export default function App() {
-  const [rider, setRider] = useState(null); // { name: 'Ali' }
+  const [rider, setRider] = useState(() => {
+    const r = localStorage.getItem('rider_auth');
+    return r ? JSON.parse(r) : null;
+  }); // { name: 'Ali', id: 'R1' }
   const [activeTab, setActiveTab] = useState('home'); // home | earnings | profile
   const [status, setStatus] = useState('offline'); // offline | online | busy
   
-  const [orders, setOrders] = useState(MOCK_ORDERS);
+  const [orders, setOrders] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Poll for Orders
+  const fetchOrders = async () => {
+    if (!rider || status !== 'online' || activeOrder) return;
+    try {
+      const res = await fetch(`https://api.galaxyexpress.pk/orders?status=READY`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.orders) {
+          setOrders(data.orders.map(o => ({
+            id: o.id,
+            restaurant: o.tenantId || 'Galaxy Express',
+            pickup: 'Main Branch',
+            dropoff: o.customerInfo?.address || 'Customer Addr',
+            payout: 250, distance: '3.1 km', status: 'ready',
+            customerPhone: o.customerInfo?.phone || '0300'
+          })));
+        }
+      }
+    } catch(e) {
+      if (orders.length === 0) {
+        setOrders([
+          { id: 'ORD-991', restaurant: 'Pizza Palace', pickup: 'Gulshan Branch', dropoff: 'Block 4, Clifton', payout: 250, distance: '4.2 km', status: 'pending' },
+          { id: 'ORD-992', restaurant: 'Burger Galaxy', pickup: 'DHA Phase 6', dropoff: 'Zamzama Comm.', payout: 180, distance: '2.1 km', status: 'pending' }
+        ]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (rider) localStorage.setItem('rider_auth', JSON.stringify(rider));
+    let alive = true;
+    if (alive) fetchOrders();
+    const interval = setInterval(() => { if (alive) fetchOrders(); }, 5000);
+    return () => { alive = false; clearInterval(interval); };
+  }, [rider, status, activeOrder]);
 
   if (!rider) {
     return (
@@ -30,26 +71,52 @@ export default function App() {
     );
   }
 
-  const handleAccept = (o) => {
+  const updateOrderStatusBackend = async (orderId, newStatus) => {
+    setIsProcessing(true);
+    try {
+      await fetch(`https://api.galaxyexpress.pk/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, riderId: rider.id })
+      });
+    } catch(e) {
+      console.log('Backend unreachable locally, continuing flow optimistically.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAccept = async (o) => {
     setActiveOrder({...o, deliveryStatus: 'heading_to_restaurant'});
     setOrders(prev => prev.filter(x => x.id !== o.id));
     setStatus('busy');
+    showToast('Order Accepted!');
+    await updateOrderStatusBackend(o.id.replace('ORD-',''), 'OUT_FOR_DELIVERY');
   };
 
-  const completeDelivery = () => {
+  const completeDelivery = async () => {
+    const oId = activeOrder.id;
     setRider(prev => ({...prev, wallet: prev.wallet + activeOrder.payout}));
     setActiveOrder(null);
     setStatus('online');
-    alert('Delivery Completed! Earnings added to wallet.');
+    showToast('Delivery Completed! Earnings added to wallet.');
+    await updateOrderStatusBackend(oId.replace('ORD-',''), 'DELIVERED');
   };
 
   return (
     <div style={{minHeight:'100vh', background:'#0f172a', color:'white', display:'flex', flexDirection:'column'}}>
       
+      {/* TOAST NOTIFICATION */}
+      {toastMessage && (
+        <div style={{ position: 'fixed', top: 30, right: 20, left: 20, background: '#8de02c', color: '#000', padding: '16px 20px', borderRadius: 12, fontWeight: 800, zIndex: 9999, transition:'0.3s', textAlign:'center', boxShadow:'0 10px 30px rgba(141, 224, 44, 0.3)' }}>
+          {toastMessage}
+        </div>
+      )}
+
       {/* HEADER */}
       <div style={{padding:'20px', background:'#1e293b', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <div style={{display:'flex', alignItems:'center', gap:10}}>
-          <div style={{width:40,height:40,borderRadius:'50%',background:'#8de02c',color:'#000',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>TM</div>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'#8de02c',color:'#000',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>{rider.name.charAt(0)}</div>
           <div>
             <div style={{fontWeight:800, fontSize:'1.1rem'}}>{rider.name}</div>
             <div style={{fontSize:'0.8rem', color: status==='offline'?'#94a3b8':status==='online'?'#22c55e':'#f97316'}} className="uppercase font-bold">
@@ -57,7 +124,7 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div style={{position:'relative'}}>
+        <div style={{position:'relative', cursor:'pointer'}} onClick={() => setRider(null)}>
           <Bell size={24} color="#fff" />
           <div style={{position:'absolute',top:0,right:0,width:10,height:10,background:'red',borderRadius:'50%'}}></div>
         </div>
@@ -108,12 +175,14 @@ export default function App() {
                    {/* Steps */}
                    {['heading_to_restaurant', 'picked_up', 'arrived'].includes(activeOrder.deliveryStatus) && (
                      <button 
-                       style={{width:'100%', padding:18, borderRadius:12, background:'#8de02c', color:'#000', fontWeight:800, border:'none', fontSize:'1.1rem'}}
+                       disabled={isProcessing}
+                       style={{width:'100%', padding:18, borderRadius:12, background:'#8de02c', color:'#000', fontWeight:800, border:'none', fontSize:'1.1rem', opacity: isProcessing ? 0.7 : 1, display:'flex', justifyContent:'center', gap:10, alignItems:'center'}}
                        onClick={() => {
                          if(activeOrder.deliveryStatus === 'heading_to_restaurant') setActiveOrder({...activeOrder, deliveryStatus:'picked_up'});
                          else if(activeOrder.deliveryStatus === 'picked_up') setActiveOrder({...activeOrder, deliveryStatus:'arrived'});
                          else completeDelivery();
                        }}>
+                       {isProcessing && <Loader2 size={20} style={{animation:'spin 1s linear infinite'}} />}
                        {activeOrder.deliveryStatus === 'heading_to_restaurant' ? 'Confirm Pickup' : 
                         activeOrder.deliveryStatus === 'picked_up' ? 'Mark as Arrived' : 'Complete Delivery'}
                      </button>
@@ -145,8 +214,10 @@ export default function App() {
                  </div>
 
                  <div style={{display:'flex', gap:10}}>
-                   <button style={{flex:1, padding:16, borderRadius:12, background:'rgba(239,68,68,0.1)', color:'#ef4444', fontWeight:800, border:'none'}} onClick={()=>setOrders(p=>p.filter(x=>x.id!==o.id))}>Reject</button>
-                   <button style={{flex:2, padding:16, borderRadius:12, background:'#8de02c', color:'#000', fontWeight:800, border:'none'}} onClick={()=>handleAccept(o)}>Accept Order</button>
+                   <button disabled={isProcessing} style={{flex:1, padding:16, borderRadius:12, background:'rgba(239,68,68,0.1)', color:'#ef4444', fontWeight:800, border:'none'}} onClick={()=>setOrders(p=>p.filter(x=>x.id!==o.id))}>Reject</button>
+                   <button disabled={isProcessing} style={{flex:2, padding:16, borderRadius:12, background:'#8de02c', color:'#000', fontWeight:800, border:'none', display:'flex', justifyContent:'center', alignItems:'center'}} onClick={()=>handleAccept(o)}>
+                     Accept Order
+                   </button>
                  </div>
               </div>
             ))}

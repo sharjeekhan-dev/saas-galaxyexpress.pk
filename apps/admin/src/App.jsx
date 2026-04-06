@@ -211,6 +211,7 @@ function AdminDashboard({ user, onLogout }) {
   // Theme toggle
   useEffect(() => {
     document.body.classList.toggle('dark', isDark);
+    document.body.classList.toggle('light', !isDark);
     localStorage.setItem('erp_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
