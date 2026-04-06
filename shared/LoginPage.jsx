@@ -31,13 +31,21 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
     setError('');
     setLoading(true);
 
-    // UI DEMO BYPASS: Grant instant access exactly identical to backend behaviour
-    setTimeout(() => {
-      const assignedRole = (allowedRoles && allowedRoles.length > 0) ? allowedRoles[0] : 'SUPER_ADMIN';
-      const data = {
-        token: 'mock_demo_token',
-        user: { id: 'mock_demo_user', name: 'UI Validation User', role: assignedRole, email }
-      };
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(data.user.role)) {
+        throw new Error('Access denied: Unauthorized role for this application');
+      }
 
       localStorage.setItem('erp_token', data.token);
       localStorage.setItem('erp_user', JSON.stringify(data.user));
@@ -50,7 +58,11 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
           if (onSuccess) onSuccess(data);
         }
       });
-    }, 400);
+    } catch (err) {
+      setError(err.message || 'Unable to connect to server');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

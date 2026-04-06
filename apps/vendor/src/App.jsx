@@ -624,6 +624,9 @@ export default function App() {
               <Bell size={20} color={theme.text} />
               <div style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, background: '#ef4444', borderRadius: '50%' }}></div>
             </div>
+            <button onClick={() => setVendor(null)} style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <LogOut size={16} /> Sign Out
+            </button>
           </div>
         </header>
 
