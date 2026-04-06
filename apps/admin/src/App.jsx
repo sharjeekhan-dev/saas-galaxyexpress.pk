@@ -155,8 +155,8 @@ function LoginScreen({ onLogin }) {
             background: 'linear-gradient(45deg, #39FF14, #8de02c)', 
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
           }}>⚡</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>GalaxyERP</h1>
-          <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: '0.9rem' }}>Enterprise Super Admin Dashboard</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>Partner Panel</h1>
+          <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: '0.9rem' }}>partner.galaxyexpress.pk</p>
         </div>
 
         {error && <div className="login-error" style={{ 
@@ -319,8 +319,8 @@ function AdminDashboard({ user, onLogout }) {
           <div className="brand">
             <div className="brand-icon">⚡</div>
             <div>
-              <div className="brand-name">GalaxyERP</div>
-              <div className="brand-tag">Super Admin</div>
+              <div className="brand-name">Partner Panel</div>
+              <div className="brand-tag">partner.galaxyexpress.pk</div>
             </div>
           </div>
         </div>

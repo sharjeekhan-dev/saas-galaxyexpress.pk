@@ -402,8 +402,8 @@ export default function App() {
 
   if (!vendor) {
     return <LoginPage 
-             title="Vendor Portal" 
-             subtitle="Manage your cloud restaurant" 
+             title="ERP Vendor Portal" 
+             subtitle="erp.galaxyexpress.pk" 
              icon={<Store size={48} color="#8de02c" />} 
              onSuccess={(data) => setVendor({ ...data.user, id: data.user.tenantId || data.user.id })} 
              allowedRoles={['VENDOR', 'VENDOR_ADMIN', 'SUPER_ADMIN', 'CASHIER']} 
@@ -572,8 +572,8 @@ export default function App() {
       <aside style={{ width: 250, background: theme.navBg, borderRight: `1px solid ${theme.border}`, display: isMobile ? (mobileMenu ? 'flex' : 'none') : 'flex', flexDirection: 'column', position: isMobile ? 'fixed' : 'relative', top: 0, left: 0, bottom: 0, zIndex: 50, boxShadow: isMobile ? '4px 0 20px rgba(0,0,0,0.3)' : 'none' }}>
         <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontWeight: 900, color: '#8de02c', fontSize: '1.2rem' }}>GalaxyERP</div>
-            <div style={{ fontSize: '0.75rem', color: theme.muted, fontWeight: 700, textTransform: 'uppercase' }}>Vendor Panel</div>
+            <div style={{ fontWeight: 900, color: '#8de02c', fontSize: '1.2rem' }}>ERP Portal</div>
+            <div style={{ fontSize: '0.75rem', color: theme.muted, fontWeight: 700, textTransform: 'uppercase' }}>erp.galaxyexpress.pk</div>
           </div>
           {isMobile && <X onClick={() => setMobileMenu(false)} style={{ cursor: 'pointer' }} color={theme.text} />}
         </div>
