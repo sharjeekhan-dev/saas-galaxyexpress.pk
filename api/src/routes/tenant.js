@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth, requireRole, requireTenant } from '../middlewares/auth.js';
+import { requireAuth, requireRole } from '../middlewares/auth.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -22,13 +22,22 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => 
   try {
     const schema = z.object({
       name: z.string().min(2),
-      subdomain: z.string().min(2),
+      subdomain: z.string().toLowerCase().min(2),
       plan: z.enum(['BASIC', 'PRO', 'ENTERPRISE']).optional(),
+      isActive: z.boolean().optional(),
+      billingExpiry: z.string().optional(),
+      featureToggles: z.record(z.boolean()).optional(),
+      limits: z.record(z.number()).optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
 
-    const tenant = await req.prisma.tenant.create({ data: parsed.data });
+    const tenant = await req.prisma.tenant.create({ 
+      data: {
+        ...parsed.data,
+        billingExpiry: parsed.data.billingExpiry ? new Date(parsed.data.billingExpiry) : null
+      } 
+    });
     res.status(201).json(tenant);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Subdomain already taken' });
@@ -36,28 +45,38 @@ router.post('/', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => 
   }
 });
 
-// PUT /api/tenant/:id — update tenant
-router.put('/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
+// PATCH /api/tenant/:id — granular update for SaaS settings
+router.patch('/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
   try {
-    const { name, plan, isActive, stripeAccountId, goPayFastKey, aiApiKey } = req.body;
+    const { 
+      name, plan, isActive, isSuspended, suspensionReason, 
+      billingExpiry, featureToggles, limits, 
+      stripeAccountId, goPayFastKey, aiApiKey 
+    } = req.body;
+    
     const tenant = await req.prisma.tenant.update({
       where: { id: req.params.id },
-      data: { name, plan, isActive, stripeAccountId, goPayFastKey, aiApiKey }
+      data: { 
+        name, plan, isActive, isSuspended, suspensionReason,
+        billingExpiry: billingExpiry ? new Date(billingExpiry) : undefined,
+        featureToggles, limits,
+        stripeAccountId, goPayFastKey, aiApiKey 
+      }
     });
     res.json(tenant);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to update tenant configuration' });
   }
 });
 
-// DELETE /api/tenant/:id — suspend/delete tenant
+// SUSPEND TENANT (Legacy alias for patch)
 router.delete('/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
   try {
     await req.prisma.tenant.update({
       where: { id: req.params.id },
-      data: { isActive: false }
+      data: { isActive: false, isSuspended: true, suspensionReason: 'Manually revoked by admin.' }
     });
-    res.json({ message: 'Tenant suspended' });
+    res.json({ message: 'Tenant infrastructure suspended' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

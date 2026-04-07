@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── HELPER FUNCTIONS ───────────────────────────────────────────────────
+    
+    // Check if the user is authenticated
+    function isAuth() { return request.auth != null; }
+
+    // Get current user's profile from 'users' collection
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Check if the user is a Super Admin
+    function isSuper() {
+      return isAuth() && getUserData().role == 'SUPER_ADMIN';
+    }
+
+    // Check if a document belongs to the user's tenant
+    function isTenantOwner(docData) {
+      return isAuth() && (docData.tenantId == getUserData().tenantId);
+    }
+
+    // Check if the user is an owner/admin of the tenant
+    function isVendor() {
+      return isAuth() && (getUserData().role == 'VENDOR' || getUserData().role == 'ADMIN');
+    }
+
+    // ─── COLLECTION RULES ───────────────────────────────────────────────────
+
+    // 1. Users Collection
+    match /users/{uid} {
+      allow read: if isSuper() || (isAuth() && request.auth.uid == uid);
+      allow write: if isSuper(); // Only Super Admin or Cloud Function can adjust roles
+    }
+
+    // 2. Tenants Collection
+    match /tenants/{tenantId} {
+      allow read: if isSuper() || (isAuth() && getUserData().tenantId == tenantId);
+      allow write: if isSuper(); // Only Super Admin manages SaaS infrastructure
+    }
+
+    // 3. Global Stats
+    match /stats/global {
+      allow read: if isSuper();
+      allow write: if false; // Only Cloud Functions can update stats
+    }
+
+    // 4. Multi-Tenant Collections (Orders, Inventory, Products, etc.)
+    match /{collection}/{docId} {
+      // Apply isolation to order, inventory, products...
+      allow read: if isSuper() || isTenantOwner(resource.data);
+      allow create: if isAuth() && request.resource.data.tenantId == getUserData().tenantId;
+      allow update: if isSuper() || isTenantOwner(resource.data);
+      allow delete: if isSuper(); // Restrict deletion to Super Admin
+    }
+
+    // Scoped rules for public assets
+    match /public_configs/{configId} {
+      allow read: if true;
+    }
+  }
+}

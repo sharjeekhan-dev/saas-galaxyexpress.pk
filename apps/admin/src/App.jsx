@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Store, Bike, FileText,
   CreditCard, Bell, Settings, Building, UserPlus, ChefHat, Printer,
   LogOut, RefreshCw, Moon, Sun, Globe, TrendingUp, DollarSign, Layers,
   Tag, Image, BookOpen, Key, UserCog, MapPin, Receipt, Percent, Wallet,
   Truck, Shield, HelpCircle, BarChart3, MessageCircle, Menu, X,
-  ShoppingBag, Factory, Briefcase, Users2, ClipboardList
+  ShoppingBag, Factory, Briefcase, Users2, ClipboardList, Search, Eye
 } from 'lucide-react';
 
 import DashboardPage from './components/DashboardPage.jsx';
@@ -30,67 +30,66 @@ import CategoriesPage from './components/CategoriesPage.jsx';
 import OutletsPage from './components/OutletsPage.jsx';
 import GalleryPage from './components/GalleryPage.jsx';
 
+// UNIFIED ERP COMPONENTS (MIGRATED FROM VENDOR)
+import InventoryERP from './components/erp/InventoryERP.jsx';
+import AccountsERP from './components/erp/AccountsERP.jsx';
+import DailyClosingERP from './components/erp/DailyClosingERP.jsx';
+import MasterConfiguration from './components/erp/MasterConfiguration.jsx';
+
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
-export const headers = () => ({
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${localStorage.getItem('erp_token')}`
-});
+
+// Headers helper now handles impersonation
+export const getHeaders = (impersonateId = null) => {
+  const h = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('erp_token')}`
+  };
+  if (impersonateId) h['x-impersonate-tenant'] = impersonateId;
+  return h;
+};
 
 // ─── NAV CONFIG ────────────────────────────────────────────────────────────
 const NAV = [
-  { section: 'Main' },
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'orders', label: 'Orders', icon: ShoppingCart, badge: 'Live' },
-  { id: 'pos', label: 'POS Terminal', icon: Receipt },
-  { section: 'Catalog' },
-  { id: 'products', label: 'Products', icon: Package },
-  { id: 'categories', label: 'Categories', icon: Layers },
-  { id: 'inventory', label: 'Inventory', icon: Factory },
-  { section: 'People' },
-  { id: 'users', label: 'Users & Roles', icon: Users },
-  { id: 'vendors', label: 'Vendors', icon: Store },
-  { id: 'riders', label: 'Riders', icon: Bike },
-  { id: 'customers', label: 'Customers', icon: UserCog },
-  { section: 'Operations' },
-  { id: 'outlets', label: 'Outlets & Tables', icon: MapPin },
-  { id: 'kds', label: 'Kitchen (KDS)', icon: ChefHat },
-  { id: 'delivery', label: 'Delivery Zones', icon: Truck },
-  { section: 'Finance' },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'invoices', label: 'Invoices', icon: FileText },
-  { id: 'finance', label: 'Payments', icon: CreditCard },
-  { id: 'commissions', label: 'Commissions', icon: Percent },
-  { id: 'wallets', label: 'Wallets', icon: Wallet },
-  { section: 'B2B & ERP' },
-  { id: 'b2b', label: 'B2B Portal', icon: Briefcase },
-  { id: 'hr', label: 'HR & Staff', icon: Users2 },
-  { section: 'Marketing' },
-  { id: 'coupons', label: 'Coupons', icon: Tag },
-  { id: 'banners', label: 'Banners', icon: Image },
-  { id: 'gallery', label: 'Media Gallery', icon: Image, badge: 'New' },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { section: 'Content' },
-  { id: 'blog', label: 'Blog / CMS', icon: BookOpen },
-  { id: 'faqs', label: 'FAQs', icon: HelpCircle },
-  { section: 'System' },
-  { id: 'tenants', label: 'Tenants', icon: Building },
-  { id: 'leads', label: 'Leads', icon: UserPlus },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'api_keys', label: 'API Keys', icon: Key },
-  { id: 'printers', label: 'Printers', icon: Printer },
+  { section: 'Global SaaS Control' },
+  { id: 'dashboard', label: 'Monitor Dashboard', icon: LayoutDashboard },
+  { id: 'tenants', label: 'Tenants & Subs', icon: Building, badge: 'SaaS' },
+  { id: 'leads', label: 'Inbound Leads', icon: UserPlus },
+  
+  { section: 'Merchant Operations' },
+  { id: 'pos', label: 'Cloud POS Terminal', icon: Receipt },
+  { id: 'orders', label: 'Unified Orders', icon: ShoppingCart, badge: 'Live' },
+  { id: 'inventory_erp', label: 'Inventory (B2B)', icon: Factory },
+  { id: 'daily_closing', label: 'Daily Closings', icon: RefreshCw },
+
+  { section: 'Finance & ERP' },
+  { id: 'finance_erp', label: 'Accounting Hub', icon: BarChart3 },
+  { id: 'invoices', label: 'Bill Generation', icon: FileText },
+  { id: 'wallets', label: 'Partner Wallets', icon: Wallet },
+  { id: 'products', label: 'Master Catalog', icon: Package },
+
+  { section: 'Governance' },
+  { id: 'users', label: 'Users & RBAC', icon: Users },
+  { id: 'hr', label: 'HR & Management', icon: Users2 },
+  { id: 'outlets', label: 'Global Outlets', icon: MapPin },
+  { id: 'delivery', label: 'Logistics Control', icon: Truck },
+
+  { section: 'Marketing & CRM' },
+  { id: 'customers', label: 'Customer DB', icon: UserCog },
+  { id: 'coupons', label: 'Coupons/Offers', icon: Tag },
+  { id: 'banners', label: 'Banners Hub', icon: Image },
+
+  { section: 'Cloud Infrastructure' },
+  { id: 'gallery', label: 'Media Assets', icon: Image },
+  { id: 'api_keys', label: 'Service Microkeys', icon: Key },
+  { id: 'settings', label: 'Global Setup', icon: Settings },
 ];
 
 const PAGE_TITLES = {
-  dashboard: 'Dashboard', orders: 'Order Management', pos: 'POS Terminal',
-  products: 'Products', categories: 'Categories', inventory: 'Inventory',
-  users: 'Users & Roles', vendors: 'Vendor Management', riders: 'Rider Management',
-  customers: 'Customer Management', outlets: 'Outlets & Tables', kds: 'Kitchen Display',
-  delivery: 'Delivery Zones', reports: 'Reports & Analytics', invoices: 'Invoices',
-  finance: 'Payments & Payouts', commissions: 'Commissions', wallets: 'Wallets & Ledger',
-  b2b: 'B2B Portal', hr: 'HR & Staff', coupons: 'Coupons', banners: 'Banners',
-  notifications: 'Notifications', blog: 'Blog / CMS', faqs: 'FAQs',
-  tenants: 'Tenant Management', leads: 'Leads', gallery: 'Media Gallery (Cloud)',
-  settings: 'Settings', api_keys: 'API Keys', printers: 'Printers',
+  dashboard: 'Monitoring Dashboard', orders: 'Unified Order Control', pos: 'Cloud POS Terminal',
+  products: 'Global Catalog', inventory_erp: 'ERP Inventory Controller',
+  users: 'RBAC - Access Control', finance_erp: 'Accounting Hub (Unified)',
+  tenants: 'SaaS Tenant Management', daily_closing: 'Operational Closings',
+  gallery: 'Cloud Media Assets', settings: 'Infrastructure Setup', hr: 'Employee Management',
 };
 
 // ─── GENERIC PLACEHOLDER ────────────────────────────────────────────────────
@@ -109,8 +108,10 @@ function GenericPage({ icon: Icon, title, subtitle }) {
   );
 }
 
-// ─── LOGIN ──────────────────────────────────────────────────────────────────
-// ─── LOGIN ──────────────────────────────────────────────────────────────────
+import { auth, db } from './lib/firebase.js';
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, doc, getDoc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -123,23 +124,23 @@ function LoginScreen({ onLogin }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      
+      if (!userDoc.exists()) {
+        throw new Error('User profile not found in database');
+      }
 
-      if (data.user.role !== 'SUPER_ADMIN') {
+      const userData = userDoc.data();
+      if (userData.role !== 'SUPER_ADMIN') {
+        await signOut(auth);
         throw new Error('Unauthorized role for Admin Panel');
       }
 
-      localStorage.setItem('erp_token', data.token);
-      localStorage.setItem('erp_user', JSON.stringify(data.user));
-      onLogin(data);
+      onLogin(userData);
     } catch (err) {
-      setError(err.message || 'Unable to connect to server');
+      console.error(err);
+      setError(err.message || 'Authentication failed');
     } finally { setLoading(false); }
   };
 
@@ -211,10 +212,16 @@ function AdminDashboard({ user, onLogout }) {
   const [isDark, setIsDark] = useState(() => localStorage.getItem('erp_theme') === 'dark');
   const [searchGlobal, setSearchGlobal] = useState('');
   const [showProfile, setShowProfile] = useState(false);
+  
+  // ─── SAAS IMPERSONATION STATE ─────────────────────────────────────────────
+  const [activeTenant, setActiveTenant] = useState(null);
+  
   const [data, setData] = useState({
     tenants: [], leads: [], users: [], orders: [], products: [],
     stats: { totalTenants: 0, totalUsers: 0, totalOrders: 0, totalRevenue: 0 }
   });
+
+  const headers = useMemo(() => getHeaders(activeTenant?.id), [activeTenant]);
 
   // Theme toggle
   useEffect(() => {
@@ -223,64 +230,75 @@ function AdminDashboard({ user, onLogout }) {
     localStorage.setItem('erp_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  const loadData = useCallback(async () => {
-    const h = headers();
-    const safe = (url) => fetch(`${API}${url}`, { headers: h }).then(r => r.json()).catch(() => null);
-    const [t, l, u, s, o, p] = await Promise.all([
-      safe('/api/tenant'), safe('/api/leads'), safe('/api/users'),
-      safe('/api/tenant/stats'), safe('/api/pos/orders'), safe('/api/products')
-    ]);
-    setData(prev => ({
-      tenants: Array.isArray(t) ? t : prev.tenants,
-      leads: Array.isArray(l) ? l : prev.leads,
-      users: Array.isArray(u) ? u : prev.users,
-      orders: Array.isArray(o) ? o : prev.orders,
-      products: Array.isArray(p) ? p : prev.products,
-      stats: (s && s.totalTenants !== undefined) ? s : prev.stats,
-    }));
-  }, []);
-
-  // Load data once + live polling every 8 seconds
+  // ─── REAL-TIME DATA SYNC ───
   useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 8000);
-    return () => clearInterval(interval);
-  }, [loadData]);
+    // 1. Tenants Listener
+    const unsubTenants = onSnapshot(collection(db, 'tenants'), (snap) => {
+      const t = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setData(prev => ({ ...prev, tenants: t }));
+    });
+
+    // 2. Global Stats (Pseudo-aggregation or dedicated doc)
+    const unsubStats = onSnapshot(doc(db, 'stats', 'global'), (snap) => {
+      if (snap.exists()) setData(prev => ({ ...prev, stats: snap.data() }));
+    });
+
+    // 3. Orders Listener (Optionally scoped to tenant)
+    const ordersRef = collection(db, 'orders');
+    const qOrders = activeTenant 
+      ? query(ordersRef, where('tenantId', '==', activeTenant.id), orderBy('createdAt', 'desc'))
+      : query(ordersRef, orderBy('createdAt', 'desc'));
+
+    const unsubOrders = onSnapshot(qOrders, (snap) => {
+      const o = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setData(prev => ({ ...prev, orders: o }));
+    });
+
+    return () => {
+      unsubTenants();
+      unsubStats();
+      unsubOrders();
+    };
+  }, [activeTenant]);
+
+  const loadData = useCallback(() => {
+    // Legacy fetch logic replaced by Real-time listeners above
+    console.log('Real-time sync active...');
+  }, []);
 
   // Close sidebar on nav click (mobile)
   const navigate = (id) => { setPage(id); setSidebarOpen(false); };
 
+
   const renderPage = () => {
+    // Current context for child components
+    const ctxProps = { headers, activeTenant, onRefresh: loadData };
+
     switch (page) {
       case 'dashboard': return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
-      case 'orders': return <OrdersPage orders={data.orders} onRefresh={loadData} />;
-      case 'pos': return <POSTerminal products={data.products} onRefresh={loadData} />;
-      case 'products': return <ProductsPage products={data.products} onRefresh={loadData} />;
-      case 'kds': return <KdsScreen orders={data.orders} onRefresh={loadData} />;
+      case 'orders': return <OrdersPage orders={data.orders} {...ctxProps} />;
+      case 'pos': return <POSTerminal products={data.products} {...ctxProps} />;
+      case 'products': return <ProductsPage products={data.products} {...ctxProps} />;
+      case 'inventory_erp': return <InventoryERP tenant={activeTenant} headers={headers} />;
+      case 'finance_erp': return <AccountsERP tenant={activeTenant} headers={headers} />;
+      case 'daily_closing': return <DailyClosingERP tenant={activeTenant} headers={headers} />;
+      case 'kds': return <KdsScreen orders={data.orders} {...ctxProps} />;
       case 'vendors': return <VendorsPage />;
       case 'riders': return <RidersPage />;
-      case 'inventory': return <InventoryPage products={data.products} />;
-      case 'reports': return <ReportsPage />;
-      case 'invoices': return <InvoicesPage />;
       case 'wallets':
       case 'finance': return <WalletsPage />;
       case 'commissions': return <WalletsPage />;
-      case 'b2b': return <B2BPage />;
       case 'customers': return <CustomersPage />;
-      case 'users': return <UsersPage users={data.users} onRefresh={loadData} />;
-      case 'tenants': return <TenantsPage tenants={data.tenants} onRefresh={loadData} />;
+      case 'users': return <UsersPage users={data.users} {...ctxProps} />;
+      case 'tenants': return <TenantsPage tenants={data.tenants} {...ctxProps} />;
       case 'settings': return <SettingsPage />;
-      case 'categories': return <CategoriesPage />;
       case 'outlets': return <OutletsPage />;
       case 'delivery': return <GenericPage icon={Truck} title="Delivery Zones" subtitle="Create map-based delivery zones" />;
       case 'coupons': return <GenericPage icon={Tag} title="Coupons" subtitle="Create discount codes and offers" />;
-      case 'banners': return <GenericPage icon={Image} title="Banners" subtitle="Manage marketing banners" />;
-      case 'notifications': return <GenericPage icon={Bell} title="Notifications" subtitle="Push notifications to users" />;
+      case 'banners': return <GenericPage icon={Image} title="Banners Hub" subtitle="Manage marketing banners" />;
       case 'blog': return <GenericPage icon={BookOpen} title="Blog / CMS" subtitle="Manage content pages" />;
-      case 'faqs': return <GenericPage icon={HelpCircle} title="FAQs" subtitle="Manage FAQ entries" />;
       case 'hr': return <HRPage />;
       case 'api_keys': return <GenericPage icon={Key} title="API Keys" subtitle="Manage Google, Firebase, Stripe keys" />;
-      case 'printers': return <GenericPage icon={Printer} title="Printers" subtitle="Configure thermal and A4 printers" />;
       case 'leads': return <GenericPage icon={UserPlus} title="Lead Management" subtitle="Incoming vendor/tenant leads" />;
       case 'gallery': return <GalleryPage user={user} />;
       default: return <DashboardPage stats={data.stats} orders={data.orders} onNav={navigate} />;
@@ -341,7 +359,7 @@ function AdminDashboard({ user, onLogout }) {
       </aside>
 
       {/* ── TOPBAR ── */}
-      <header className="topbar">
+      <header className="topbar" style={{ height: activeTenant ? 85 : 70 }}>
         <div className="topbar-left">
           <button
             className="hamburger-btn"
@@ -351,13 +369,36 @@ function AdminDashboard({ user, onLogout }) {
             {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-              <span>Platform</span> <span style={{ opacity: 0.3 }}>/</span> 
-              <span>{page === 'dashboard' ? 'Admin' : 'Operations'}</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <span>Infrastructure</span> <span style={{ opacity: 0.3 }}>/</span> 
+              <span>{activeTenant ? `Tenant: ${activeTenant.name}` : 'Global Monitor'}</span>
             </div>
-            <h1 className="page-title" style={{ marginTop: -2 }}>{PAGE_TITLES[page] || 'Dashboard'}</h1>
+            <h1 className="page-title" style={{ marginTop: -2, fontSize: '1.2rem' }}>{PAGE_TITLES[page] || 'Core Control'}</h1>
           </div>
         </div>
+
+        {/* ── SAAS TENANT SWITCHER ── */}
+        <div className="topbar-center" style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: activeTenant ? 'rgba(57, 255, 20, 0.08)' : 'var(--bg-card)', padding: '6px 14px', borderRadius: 12, border: `1px solid ${activeTenant ? '#39FF14' : 'var(--border-color)'}`, transition: '0.3s' }}>
+            <Building size={16} color={activeTenant ? '#39FF14' : 'var(--text-muted)'} />
+            <select 
+              value={activeTenant?.id || ''} 
+              onChange={(e) => {
+                const t = data.tenants.find(x => x.id === e.target.value);
+                setActiveTenant(t || null);
+                loadData();
+              }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', fontWeight: 700, fontSize: '0.85rem', outline: 'none', cursor: 'pointer', minWidth: 200 }}
+            >
+              <option value="">🌐 GLOBAL PLATFORM VIEW</option>
+              {data.tenants.map(t => (
+                <option key={t.id} value={t.id}>🏢 {t.name} ({t.subdomain})</option>
+              ))}
+            </select>
+            {activeTenant && <div style={{ background: '#39FF14', color: '#000', fontSize: '0.55rem', fontWeight: 900, padding: '2px 5px', borderRadius: 4 }}>LIVE IMPERSONATION</div>}
+          </div>
+        </div>
+
         <div className="topbar-right">
           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 12px' }}>
             <Search size={14} color="var(--text-muted)" />
@@ -369,14 +410,10 @@ function AdminDashboard({ user, onLogout }) {
               onChange={e => setSearchGlobal(e.target.value)}
             />
           </div>
-          <button className="topbar-btn" onClick={loadData} title="Refresh Live Data">
+          <button className="topbar-btn" onClick={loadData} title="Force Resync All Data">
             <RefreshCw size={16} />
           </button>
-          <button className="topbar-btn" title="Pending Approvals & Notifications">
-            <Bell size={16} />
-            <span className="notif-dot" />
-          </button>
-          <button className="topbar-btn" onClick={() => setIsDark(d => !d)} title="Switch Perspective (Dark/Light)">
+          <button className="topbar-btn" onClick={() => setIsDark(d => !d)}>
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
         </div>
@@ -406,23 +443,27 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('erp_token');
-    const savedUser = localStorage.getItem('erp_user');
-    if (token && savedUser) {
-      try {
-        const u = JSON.parse(savedUser);
-        // Strict role validation - only allow pre-verified SUPER_ADMINs
-        if (u && u.role === 'SUPER_ADMIN') {
-           setUser(u);
-           setAuthed(true);
-        } else {
-           localStorage.removeItem('erp_token');
-           localStorage.removeItem('erp_user');
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Fetch additional role data from Firestore
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData.role === 'SUPER_ADMIN') {
+            setUser(userData);
+            setAuthed(true);
+          } else {
+            await signOut(auth);
+            setAuthed(false);
+          }
         }
-      } catch { 
-        localStorage.clear();
+      } else {
+        setAuthed(false);
+        setUser(null);
       }
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   if (!authed) return (
@@ -431,10 +472,10 @@ export default function App() {
   return (
     <AdminDashboard
       user={user}
-      onLogout={() => {
-        localStorage.removeItem('erp_token');
-        localStorage.removeItem('erp_user');
-        setAuthed(false); setUser(null);
+      onLogout={async () => {
+        await signOut(auth);
+        setAuthed(false); 
+        setUser(null);
       }}
     />
   );

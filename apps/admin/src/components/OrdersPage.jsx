@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { API, headers } from '../App.jsx';
 import {
   ShoppingCart, Eye, Edit, Trash2, X, Copy, Pencil, RotateCcw,
   ChevronDown, Download, Filter, Search, Printer, FileText,
   Clock, CheckCircle, Truck, XCircle, MoreHorizontal
 } from 'lucide-react';
+import { db } from '../lib/firebase.js';
+import { doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 const STATUS_MAP = {
   PENDING:    { label:'Pending',     badge:'badge-warning',  icon: Clock },
@@ -15,17 +16,8 @@ const STATUS_MAP = {
   CANCELLED:  { label:'Cancelled',   badge:'badge-danger',   icon: XCircle },
 };
 
-const MOCK_ORDERS = [
-  { id:'ORD-10041', customer:'Ali Khan', phone:'+92 321 1234567', items:3, total:2450, status:'PENDING', type:'DELIVERY', date:'2026-04-05 14:32', outlet:'Main Branch', rider:null, deletedAt:null, renamedTo:null },
-  { id:'ORD-10040', customer:'Sara Ahmed', phone:'+92 300 9876543', items:2, total:1250, status:'PREPARING', type:'DINE_IN', date:'2026-04-05 14:10', outlet:'Main Branch', rider:null, deletedAt:null, renamedTo:null },
-  { id:'ORD-10039', customer:'Omar Sheikh', phone:'+92 333 5551234', items:5, total:4800, status:'DELIVERING', type:'DELIVERY', date:'2026-04-05 13:45', outlet:'Branch 2', rider:'Ahmed Khan', deletedAt:null, renamedTo:null },
-  { id:'ORD-10038', customer:'Hassan Ali', phone:'+92 312 4445678', items:1, total:750, status:'COMPLETED', type:'TAKEAWAY', date:'2026-04-05 12:30', outlet:'Main Branch', rider:null, deletedAt:null, renamedTo:null },
-  { id:'ORD-10037', customer:'Fatima Noor', phone:'+92 345 8889012', items:4, total:3200, status:'COMPLETED', type:'DELIVERY', date:'2026-04-05 11:15', outlet:'Branch 2', rider:'Hassan Ali', deletedAt:null, renamedTo:null },
-  { id:'ORD-10036', customer:'Zain Malik', phone:'+92 301 7773456', items:2, total:1800, status:'CANCELLED', type:'DELIVERY', date:'2026-04-04 22:00', outlet:'Main Branch', rider:null, deletedAt:null, renamedTo:null },
-];
-
-export default function OrdersPage({ orders: apiOrders, onRefresh }) {
-  const [localOrders, setLocalOrders] = useState(MOCK_ORDERS);
+export default function OrdersPage({ orders = [], onRefresh, headers, activeTenant, user }) {
+  const isAdmin = user?.role === 'SUPER_ADMIN';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selected, setSelected] = useState(null);
@@ -35,13 +27,9 @@ export default function OrdersPage({ orders: apiOrders, onRefresh }) {
   const [contextMenu, setContextMenu] = useState(null);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
 
-  // get user role
-  const userRole = (() => { try { return JSON.parse(localStorage.getItem('erp_user'))?.role } catch { return 'CASHIER' } })();
-  const isAdmin = userRole === 'SUPER_ADMIN';
-
   // active vs recycled
-  const activeOrders = localOrders.filter(o => !o.deletedAt);
-  const recycledOrders = localOrders.filter(o => !!o.deletedAt);
+  const activeOrders = orders.filter(o => !o.deletedAt);
+  const recycledOrders = orders.filter(o => !!o.deletedAt);
 
   const filtered = activeOrders.filter(o => {
     if (statusFilter !== 'ALL' && o.status !== statusFilter) return false;
@@ -49,53 +37,68 @@ export default function OrdersPage({ orders: apiOrders, onRefresh }) {
       const s = search.toLowerCase();
       return (o.renamedTo || o.id).toLowerCase().includes(s) ||
         o.customer.toLowerCase().includes(s) ||
-        o.phone.includes(s);
+        o.phone?.toLowerCase().includes(s);
     }
     return true;
   });
 
-  // ─── CRUD Actions ─────────────────
-  const duplicateOrder = (order) => {
-    const newId = `ORD-${(10000 + localOrders.length + 1)}`;
-    setLocalOrders(prev => [{
-      ...order, id: newId, status: 'PENDING',
-      date: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      deletedAt: null, renamedTo: null
-    }, ...prev]);
-    setContextMenu(null);
+  // ─── Firestore Actions ─────────────────
+  const duplicateOrder = async (order) => {
+    try {
+      const { id, ...data } = order;
+      await addDoc(collection(db, 'orders'), {
+        ...data,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+        deletedAt: null,
+        renamedTo: null,
+        tenantId: activeTenant?.id || order.tenantId
+      });
+      setContextMenu(null);
+    } catch (e) { alert('Duplicate failed: ' + e.message); }
   };
 
-  const softDelete = (id) => {
-    setLocalOrders(prev => prev.map(o => o.id === id ? { ...o, deletedAt: new Date().toISOString() } : o));
-    setContextMenu(null);
+  const softDelete = async (id) => {
+    try {
+      await updateDoc(doc(db, 'orders', id), { deletedAt: new Date().toISOString() });
+      setContextMenu(null);
+    } catch (e) { alert('Delete failed'); }
   };
 
-  const restoreOrder = (id) => {
-    setLocalOrders(prev => prev.map(o => o.id === id ? { ...o, deletedAt: null } : o));
+  const restoreOrder = async (id) => {
+    try {
+      await updateDoc(doc(db, 'orders', id), { deletedAt: null });
+    } catch (e) { alert('Restore failed'); }
   };
 
-  const permanentDelete = (id) => {
+  const permanentDelete = async (id) => {
     if (!confirm('⚠️ This will permanently delete this order. Are you sure?')) return;
-    setLocalOrders(prev => prev.filter(o => o.id !== id));
+    try {
+      await deleteDoc(doc(db, 'orders', id));
+    } catch (e) { alert('Delete failed'); }
   };
 
-  const renameOrder = (id) => {
+  const renameOrder = async (id) => {
     if (!renameVal.trim()) return;
-    setLocalOrders(prev => prev.map(o => o.id === id ? { ...o, renamedTo: renameVal.trim() } : o));
-    setShowRename(null);
-    setRenameVal('');
+    try {
+      await updateDoc(doc(db, 'orders', id), { renamedTo: renameVal.trim() });
+      setShowRename(null);
+      setRenameVal('');
+    } catch (e) { alert('Rename failed'); }
   };
 
-  const changeStatus = (id, newStatus) => {
-    setLocalOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
-    setContextMenu(null);
+  const changeStatus = async (id, newStatus) => {
+    try {
+      await updateDoc(doc(db, 'orders', id), { status: newStatus });
+      setContextMenu(null);
+    } catch (e) { alert('Status update failed'); }
   };
 
   const kpis = {
     total: activeOrders.length,
     pending: activeOrders.filter(o => o.status === 'PENDING').length,
     completed: activeOrders.filter(o => o.status === 'COMPLETED').length,
-    revenue: activeOrders.filter(o => o.status === 'COMPLETED').reduce((s, o) => s + o.total, 0),
+    revenue: activeOrders.filter(o => o.status === 'COMPLETED').reduce((s, o) => s + (o.totalAmount || o.total || 0), 0),
   };
 
   return (
