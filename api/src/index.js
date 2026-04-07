@@ -116,6 +116,7 @@ import printersRoutes from './routes/printers.js';
 import notificationsRoutes from './routes/notifications.js';
 import invoicesRoutes from './routes/invoices.js';
 import backupRoutes from './routes/backup.js';
+import accountsRoutes from './routes/accounts.js';
 
 
 // ============ Register Routes ============
@@ -145,6 +146,7 @@ app.use('/api/printers', printersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/invoices', invoicesRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/accounts', accountsRoutes);
 
 
 // Health check

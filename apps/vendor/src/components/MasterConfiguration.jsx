@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Save, X, Server, Tags, Users, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Server, Tags, Users, Settings, Truck } from 'lucide-react';
 
 export default function MasterConfiguration({ theme, darkMode, showToast, API, vendor }) {
   const [activeTab, setActiveTab] = useState('units');
@@ -7,6 +7,7 @@ export default function MasterConfiguration({ theme, darkMode, showToast, API, v
   const navs = [
     { id: 'units', label: 'Units (UOM)', icon: Server },
     { id: 'categories', label: 'Categories', icon: Tags },
+    { id: 'suppliers', label: 'Suppliers', icon: Truck },
     { id: 'tables', label: 'Dine-In Tables', icon: Server },
     { id: 'users', label: 'Staff & Roles', icon: Users },
   ];
@@ -28,7 +29,8 @@ export default function MasterConfiguration({ theme, darkMode, showToast, API, v
               border: `1px solid ${theme.border}`,
               padding: '10px 24px', borderRadius: 20, fontWeight: 700,
               cursor: 'pointer', whiteSpace: 'nowrap', transition: '0.2s',
-              display: 'flex', alignItems: 'center', gap: 8
+              display: 'flex', alignItems: 'center', gap: 8,
+              boxShadow: activeTab === n.id ? '0 4px 12px rgba(141,224,44,0.3)' : 'none'
             }}
           >
             <n.icon size={16} /> {n.label}
@@ -36,12 +38,124 @@ export default function MasterConfiguration({ theme, darkMode, showToast, API, v
         ))}
       </div>
 
-      <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, minHeight: 400 }}>
+      <div style={{ background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 24, minHeight: 400, boxShadow: 'var(--shadow-sm)' }}>
         {activeTab === 'units' && <UnitsTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
         {activeTab === 'categories' && <CategoriesTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
+        {activeTab === 'suppliers' && <SuppliersTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
         {activeTab === 'users' && <UsersTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
         {activeTab === 'tables' && <TablesTab theme={theme} showToast={showToast} API={API} vendor={vendor} />}
       </div>
+    </div>
+  );
+}
+
+function SuppliersTab({ theme, showToast, API, vendor }) {
+  const [suppliers, setSuppliers] = useState([]);
+  const [isAdding, setIsAdding] = useState(false);
+  const [formData, setFormData] = useState({ name: '', contact: '', email: '', terms: '' });
+
+  const fetchSuppliers = async () => {
+    try {
+      const res = await fetch(`${API}/api/inventory/suppliers?tenantId=${vendor?.id || ''}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
+      if (res.ok) setSuppliers(await res.json());
+    } catch(e) { console.error(e); }
+  };
+
+  useEffect(() => { fetchSuppliers(); }, []);
+
+  const handleSave = async () => {
+    if(!formData.name || !formData.contact) return showToast('Name and Contact are required');
+    try {
+      const res = await fetch(`${API}/api/inventory/suppliers`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('erp_token')}`
+        },
+        body: JSON.stringify({ ...formData, tenantId: vendor?.id })
+      });
+      if(res.ok) {
+        showToast('Supplier Created');
+        setFormData({ name: '', contact: '', email: '', terms: '' });
+        setIsAdding(false);
+        fetchSuppliers();
+      } else showToast('Error saving supplier');
+    } catch(e) { showToast('Network Error'); }
+  };
+
+  const handleDelete = async (id) => {
+    if(!window.confirm('Delete supplier?')) return;
+    try {
+      const res = await fetch(`${API}/api/inventory/suppliers/${id}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
+      if(res.ok) { showToast('Supplier Deleted'); fetchSuppliers(); }
+    } catch(e) {}
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h3 style={{ margin: 0, color: theme.text }}>Vendor / Supplier Management</h3>
+        <button onClick={() => setIsAdding(!isAdding)} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isAdding ? <X size={16}/> : <Plus size={16}/>} {isAdding ? 'Cancel' : 'Register Supplier'}
+        </button>
+      </div>
+
+      {isAdding && (
+        <div style={{ background: theme.bg, padding: 20, borderRadius: 12, marginBottom: 20, border: `1px solid ${theme.border}`}}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Supplier Name</label>
+              <input value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} type="text" placeholder="e.g. Hafiz Trader" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Contact Number</label>
+              <input value={formData.contact} onChange={e=>setFormData({...formData, contact: e.target.value})} type="text" placeholder="0300-XXXXXXX" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Email (Optional)</label>
+              <input value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} type="email" placeholder="vendor@email.com" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: theme.muted, marginBottom: 6 }}>Payment Terms</label>
+              <input value={formData.terms} onChange={e=>setFormData({...formData, terms: e.target.value})} type="text" placeholder="e.g. 15 Days Credit" style={{ width: '100%', padding: '10px', borderRadius: 8, background: theme.card, color: theme.text, border: `1px solid ${theme.border}` }} />
+            </div>
+          </div>
+          <button onClick={handleSave} style={{ width: '100%', background: '#39FF14', color: '#000', border: 'none', padding: '12px', borderRadius: 8, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Save size={16} /> Save Supplier Profile
+          </button>
+        </div>
+      )}
+
+      <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+        <thead style={{ background: theme.bg, color: theme.muted, fontSize: '0.85rem' }}>
+          <tr>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Supplier Name</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Contact</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700 }}>Terms</th>
+            <th style={{ padding: '14px 16px', fontWeight: 700, width: 100 }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {suppliers.length === 0 && <tr><td colSpan={4} style={{ textAlign:'center', padding: 30, color: theme.muted }}>No suppliers registered.</td></tr>}
+          {suppliers.map(s => (
+            <tr key={s.id} style={{ borderTop: `1px solid ${theme.border}` }}>
+              <td style={{ padding: '14px 16px', fontWeight: 700, color: theme.text }}>{s.name}</td>
+              <td style={{ padding: '14px 16px', color: theme.text }}>{s.contact} <br/><span style={{fontSize:'0.75rem', color:theme.muted}}>{s.email}</span></td>
+              <td style={{ padding: '14px 16px', color: theme.muted }}>{s.terms || 'Cash'}</td>
+              <td style={{ padding: '14px 16px' }}>
+                <button onClick={() => handleDelete(s.id)} style={{ background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer' }}><Trash2 size={18} /></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

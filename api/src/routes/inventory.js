@@ -221,6 +221,134 @@ router.patch('/issuances/:id/approve', requireAuth, requireTenant, requireRole([
 });
 
 // =============================================
+// SUPPLIERS
+// =============================================
+
+router.get('/suppliers', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const suppliers = await req.prisma.supplier.findMany({
+            where: { tenantId: req.user.tenantId },
+            orderBy: { name: 'asc' }
+        });
+        res.json(suppliers);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/suppliers', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const { name, contact, email, terms } = req.body;
+        const supplier = await req.prisma.supplier.create({
+            data: { tenantId: req.user.tenantId, name, contact, email, terms }
+        });
+        res.json(supplier);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/suppliers/:id', requireAuth, requireTenant, async (req, res) => {
+    try {
+        await req.prisma.supplier.delete({ where: { id: req.params.id } });
+        res.json({ message: 'Supplier deleted' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// =============================================
+// STOCK ADJUSTMENTS
+// =============================================
+
+router.post('/adjustments', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const { locationId, locationType, notes, lines } = req.body;
+        const adj = await req.prisma.stockAdjustment.create({
+            data: {
+                tenantId: req.user.tenantId,
+                locationId, locationType, notes,
+                status: 'PENDING',
+                lines: {
+                    create: lines.map(l => ({
+                        productId: l.productId,
+                        oldQuantity: l.oldQuantity || 0,
+                        newQuantity: l.newQuantity,
+                        difference: l.newQuantity - (l.oldQuantity || 0)
+                    }))
+                }
+            }
+        });
+        res.json(adj);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch('/adjustments/:id/approve', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const adj = await req.prisma.stockAdjustment.findFirst({
+            where: { id, tenantId: req.user.tenantId, status: 'PENDING' },
+            include: { lines: true }
+        });
+        if (!adj) return res.status(404).json({ error: 'Adjustment not found' });
+
+        await req.prisma.$transaction(async (tx) => {
+            await tx.stockAdjustment.update({ where: { id }, data: { status: 'APPROVED', approvedBy: req.user.name } });
+            for (const line of adj.lines) {
+                const isStore = adj.locationType === 'STORE';
+                const stock = await ensureStock(tx, req.user.tenantId, line.productId, isStore ? adj.locationId : null, isStore ? null : adj.locationId);
+                const before = stock.quantity;
+                const after = line.newQuantity;
+
+                await tx.stock.update({ where: { id: stock.id }, data: { quantity: after } });
+                await logAudit(tx, req.user.tenantId, req.user.id, req.user.name, 'ADJUSTMENT', adj.id, line.productId, before, after, line.difference, adj.locationType, adj.locationId, adj.notes);
+            }
+        });
+        res.json({ message: 'Adjustment Approved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// =============================================
+// WASTAGE
+// =============================================
+
+router.post('/wastages', requireAuth, requireTenant, async (req, res) => {
+    try {
+        const { locationId, locationType, reason, notes, lines } = req.body;
+        const waste = await req.prisma.wastage.create({
+            data: {
+                tenantId: req.user.tenantId,
+                locationId, locationType, reason, notes,
+                status: 'PENDING',
+                lines: { create: lines.map(l => ({ productId: l.productId, quantity: l.quantity })) }
+            }
+        });
+        res.json(waste);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.patch('/wastages/:id/approve', requireAuth, requireTenant, requireRole(['SUPER_ADMIN', 'TENANT_ADMIN']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const waste = await req.prisma.wastage.findFirst({
+            where: { id, tenantId: req.user.tenantId, status: 'PENDING' },
+            include: { lines: true }
+        });
+        if (!waste) return res.status(404).json({ error: 'Wastage report not found' });
+
+        await req.prisma.$transaction(async (tx) => {
+            await tx.wastage.update({ where: { id }, data: { status: 'APPROVED', approvedBy: req.user.name } });
+            for (const line of waste.lines) {
+                const isStore = waste.locationType === 'STORE';
+                const stock = await ensureStock(tx, req.user.tenantId, line.productId, isStore ? waste.locationId : null, isStore ? null : waste.locationId);
+                if (stock.quantity < line.quantity) throw new Error(`Insufficient stock for Product ${line.productId} to log wastage`);
+
+                const before = stock.quantity;
+                const after = before - line.quantity;
+
+                await tx.stock.update({ where: { id: stock.id }, data: { quantity: after } });
+                await logAudit(tx, req.user.tenantId, req.user.id, req.user.name, 'WASTAGE', waste.id, line.productId, before, after, -line.quantity, waste.locationType, waste.locationId, `Wastage: ${waste.reason}`);
+            }
+        });
+        res.json({ message: 'Wastage Approved' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// =============================================
 // STOCK GENERAL QUERIES
 // =============================================
 

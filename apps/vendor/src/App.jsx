@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Store, Package, ShoppingCart, BarChart3, Settings, LogOut,
   Plus, Edit, Trash2, CheckCircle, Clock, Bell, DollarSign, Target, Menu, X, Star, MessageSquare, Send, PhoneCall, Info, Paperclip,
-  Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw
+  Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw, ClipboardCheck, Image
 } from 'lucide-react';
 import MasterConfiguration from './components/MasterConfiguration.jsx';
 import InventoryERP from './components/InventoryERP.jsx';
+import AccountsERP from './components/AccountsERP.jsx';
+import DailyClosingERP from './components/DailyClosingERP.jsx';
 import LoginPage from '../../../shared/LoginPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
@@ -640,6 +642,7 @@ export default function App() {
             { id: 'products', label: 'Menu Catalog', icon: Package },
             { id: 'inventory', label: 'Inventory ERP', icon: Layers },
             { id: 'accounts', label: 'Finance Hub', icon: DollarSign },
+            { id: 'closings', label: 'Daily Closings', icon: ClipboardCheck },
             { section: 'SYSTEM' },
             { id: 'gallery', label: 'Media Gallery', icon: Image },
             { id: 'reports', label: 'Performance', icon: BarChart3 },
@@ -854,81 +857,12 @@ export default function App() {
 
           {/* CLOUD ACCOUNTING ERP */}
           {activeTab === 'accounts' && (
-            <div style={{ animation: 'fadeIn 0.3s' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0, color: theme.text }}>Accounting & Ledgers</h2>
-                <button style={{ ...actBtn, background: '#39FF14', color: '#000' }}><Plus size={16} /> New Voucher / Journal</button>
-              </div>
+            <AccountsERP theme={theme} showToast={showToast} API={API} vendor={vendor} />
+          )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 24 }}>
-                <div style={{ background: theme.card, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: '0.8rem', color: theme.muted, marginBottom: 8, textTransform: 'uppercase', fontWeight: 700 }}>Total Assets</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: theme.text }}>Rs 1.2M</div>
-                </div>
-                <div style={{ background: theme.card, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: '0.8rem', color: theme.muted, marginBottom: 8, textTransform: 'uppercase', fontWeight: 700 }}>Liabilities</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#ef4444' }}>Rs 450k</div>
-                </div>
-                <div style={{ background: theme.card, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: '0.8rem', color: theme.muted, marginBottom: 8, textTransform: 'uppercase', fontWeight: 700 }}>A/R (Pending Receivables)</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#3b82f6' }}>Rs 85k</div>
-                </div>
-                <div style={{ background: theme.card, padding: 20, borderRadius: 12, border: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: '0.8rem', color: theme.muted, marginBottom: 8, textTransform: 'uppercase', fontWeight: 700 }}>A/P (Payables)</div>
-                  <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#f97316' }}>Rs 112k</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginBottom: 24, overflowX: 'auto', paddingBottom: 8 }}>
-                <button style={tabBtn(subTab === 'coa')} onClick={() => setSubTab('coa')}>Chart of Accounts</button>
-                <button style={tabBtn(subTab === 'vouchers')} onClick={() => setSubTab('vouchers')}>Vouchers (CPV, CRV, BPV, BRV, JV)</button>
-                <button style={tabBtn(subTab === 'ledger')} onClick={() => setSubTab('ledger')}>General Ledger</button>
-                <button style={tabBtn(subTab === 'trial')} onClick={() => setSubTab('trial')}>Trial Balance</button>
-                <button style={tabBtn(subTab === 'daybook')} onClick={() => setSubTab('daybook')}>Day Book</button>
-                <button style={tabBtn(subTab === 'approvals')} onClick={() => setSubTab('approvals')}>Approvals Hub</button>
-              </div>
-
-              <div style={{ ...cardBg, padding: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <h3 style={{ margin: 0, color: theme.text }}>
-                    {subTab === 'coa' ? 'Chart of Accounts (COA)' : subTab === 'vouchers' ? 'Transaction Vouchers' : subTab === 'approvals' ? 'Multi-level Approval Workflow' : 'Accounting Records'}
-                  </h3>
-                  <input type="text" placeholder="Search..." style={{ padding: '8px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }} />
-                </div>
-
-                {subTab === 'coa' && (
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                    <thead style={theadBg}><tr><th style={{ padding: '16px' }}>A/C Code</th><th style={{ padding: '16px' }}>Account Title</th><th style={{ padding: '16px' }}>Group</th><th style={{ padding: '16px' }}>Balance (Rs)</th><th style={{ padding: '16px' }}>Status</th></tr></thead>
-                    <tbody>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.muted }}>1001-01</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Meezan Bank Main A/C</td><td style={{ padding: '16px', color: theme.text }}>Current Assets / Bank</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>850,000 (Dr)</td><td style={{ padding: '16px' }}><span style={{ color: '#39FF14' }}>Active</span></td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.muted }}>2005-10</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Fresh Farms Suppliers</td><td style={{ padding: '16px', color: theme.text }}>Liabilities / A/P</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>45,000 (Cr)</td><td style={{ padding: '16px' }}><span style={{ color: '#39FF14' }}>Active</span></td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', color: theme.muted }}>4001-00</td><td style={{ padding: '16px', fontWeight: 600, color: theme.text }}>Food Sales Revenue</td><td style={{ padding: '16px', color: theme.text }}>Revenue</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>1,240,000 (Cr)</td><td style={{ padding: '16px' }}><span style={{ color: '#39FF14' }}>Active</span></td></tr>
-                    </tbody>
-                  </table>
-                )}
-
-                {subTab === 'vouchers' && (
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                    <thead style={theadBg}><tr><th style={{ padding: '16px' }}>Vch #</th><th style={{ padding: '16px' }}>Date</th><th style={{ padding: '16px' }}>Type</th><th style={{ padding: '16px' }}>Details</th><th style={{ padding: '16px' }}>Amount</th><th style={{ padding: '16px' }}>Status</th></tr></thead>
-                    <tbody>
-                      <tr style={trBdr}><td style={{ padding: '16px', fontWeight: 700, color: theme.text }}>CPV-0982</td><td style={{ padding: '16px', color: theme.muted }}>06-Apr-2026</td><td style={{ padding: '16px' }}><span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '4px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 }}>Cash Pmt</span></td><td style={{ padding: '16px', color: theme.text }}>Paid to Store boy for utility</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>Rs 1,200</td><td style={{ padding: '16px' }}><span style={{ color: '#64748b' }}>Posted</span></td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', fontWeight: 700, color: theme.text }}>JV-1102</td><td style={{ padding: '16px', color: theme.muted }}>05-Apr-2026</td><td style={{ padding: '16px' }}><span style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', padding: '4px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 }}>Journal</span></td><td style={{ padding: '16px', color: theme.text }}>Cost of Goods Sold Auto-Post</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>Rs 45,600</td><td style={{ padding: '16px' }}><span style={{ color: '#64748b' }}>Posted</span></td></tr>
-                    </tbody>
-                  </table>
-                )}
-
-                {subTab === 'approvals' && (
-                  <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-                    <thead style={theadBg}><tr><th style={{ padding: '16px' }}>Request ID</th><th style={{ padding: '16px' }}>Type</th><th style={{ padding: '16px' }}>Requested By</th><th style={{ padding: '16px' }}>Amount/Qty</th><th style={{ padding: '16px' }}>Action</th></tr></thead>
-                    <tbody>
-                      <tr style={trBdr}><td style={{ padding: '16px', fontWeight: 700, color: theme.text }}>PO-8821</td><td style={{ padding: '16px', color: theme.muted }}>Purchase Order</td><td style={{ padding: '16px', color: theme.text }}>Chef Ahmed</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>Rs 145,000</td><td style={{ padding: '16px', display: 'flex', gap: 8 }}><button style={{ background: '#39FF14', color: '#000', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>Approve</button><button style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>Reject</button></td></tr>
-                      <tr style={trBdr}><td style={{ padding: '16px', fontWeight: 700, color: theme.text }}>ST-1092</td><td style={{ padding: '16px', color: theme.muted }}>Stock Transfer</td><td style={{ padding: '16px', color: theme.text }}>Store Mgr (Branch 1)</td><td style={{ padding: '16px', fontWeight: 800, color: theme.text }}>5 Items</td><td style={{ padding: '16px', display: 'flex', gap: 8 }}><button style={{ background: '#39FF14', color: '#000', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>Approve</button><button style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', padding: '6px 12px', borderRadius: 6, fontWeight: 700, cursor: 'pointer' }}>Reject</button></td></tr>
-                    </tbody>
-                  </table>
-                )}
-
-              </div>
-            </div>
+          {/* DAILY CLOSINGS & SHIFTS */}
+          {activeTab === 'closings' && (
+            <DailyClosingERP theme={theme} showToast={showToast} API={API} vendor={vendor} />
           )}
 
           {/* REPORTS VIEW — FULL ERP CLONE */}
@@ -1623,13 +1557,26 @@ export default function App() {
                       const existing = posCart.find(x => x.id === p.id);
                       if (existing) setPosCart(posCart.map(x => x.id === p.id ? { ...x, qty: x.qty + 1 } : x));
                       else setPosCart([...posCart, { ...p, qty: 1 }]);
-                    }} style={{ background: isSalesReturn ? 'rgba(239,68,68,0.05)' : theme.card, border: `1px solid ${isSalesReturn ? '#ef4444' : theme.border}`, borderRadius: 16, padding: 16, cursor: 'pointer', transition: 'transform 0.1s', userSelect: 'none', display: 'flex', flexDirection: 'column' }}
-                      onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
-                      <div style={{ width: '100%', height: 100, background: theme.bg, borderRadius: 12, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem' }}>
-                        {p.category === 'Pizza' ? '🍕' : p.category === 'Burgers' ? '🍔' : '🍟'}
+                      // Micro-animation / Sound could go here
+                    }} style={{ 
+                      background: isSalesReturn ? 'rgba(239,68,68,0.05)' : theme.card, 
+                      border: `1px solid ${isSalesReturn ? '#ef4444' : theme.border}`, 
+                      borderRadius: 16, padding: 12, cursor: 'pointer', transition: '0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
+                      userSelect: 'none', display: 'flex', flexDirection: 'column', position: 'relative',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.03)'; }}
+                    >
+                      {p.stock === 'Low Stock' && <div style={{ position: 'absolute', top: 8, right: 8, background: '#ef4444', color: '#fff', fontSize: '0.55rem', padding: '2px 6px', borderRadius: 6, fontWeight: 900, zIndex: 2 }}>LOW STOCK</div>}
+                      <div style={{ width: '100%', height: 80, background: theme.bg, borderRadius: 10, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>
+                        {p.category === 'Pizza' ? '🍕' : p.category === 'Burgers' ? '🍔' : p.category === 'Drinks' ? '🥤' : '🍟'}
                       </div>
-                      <div style={{ fontWeight: 800, color: theme.text, marginBottom: 6, fontSize: '0.95rem' }}>{p.name}</div>
-                      <div style={{ color: isSalesReturn ? '#ef4444' : '#39FF14', fontWeight: 800 }}>{isSalesReturn ? '-' : ''}Rs {p.price}</div>
+                      <div style={{ fontWeight: 800, color: theme.text, marginBottom: 4, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ color: isSalesReturn ? '#ef4444' : '#39FF14', fontWeight: 900, fontSize: '0.9rem' }}>{isSalesReturn ? '-' : ''}Rs {p.price}</div>
+                        <div style={{ padding: 4, borderRadius: 6, background: theme.bg, fontSize: '0.65rem', color: theme.muted }}>{p.category}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
