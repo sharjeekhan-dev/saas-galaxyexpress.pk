@@ -86,10 +86,13 @@ model Tenant {
   name            String
   subdomain       String   @unique
   logo            String?
-  invoiceLogo     String?  // NEW: specific logo for invoices
+  invoiceLogo     String?  
   isActive        Boolean  @default(true)
+  isSuspended     Boolean  @default(false) // NEW: Manual override by Super Admin
+  suspensionReason String? // NEW
   plan            SubscriptionPlan @default(BASIC)
-  planFeatures    Json?    
+  featureToggles  Json?    // NEW: { "pos": true, "inventory": true, "accounting": false, ... }
+  limits          Json?    // NEW: { "maxProducts": 100, "maxOrders": 500, "maxUsers": 5 }
   billingExpiry   DateTime?
   stripeAccountId String?
   goPayFastKey    String?
@@ -114,10 +117,10 @@ model Tenant {
   commissionLedger CommissionLedger[]
   journalEntries  JournalEntry[]
   dailyClosings   DailyClosing[]
-  invoiceTemplates InvoiceTemplate[] // NEW
-  printers        Printer[]          // NEW
-  translations    Translation[]      // NEW
-  faqs            Faq[]              // NEW
+  invoiceTemplates InvoiceTemplate[]
+  printers        Printer[]          
+  translations    Translation[]      
+  faqs            Faq[]              
   activityLogs    ActivityLog[]
   wastages        Wastage[]
   purchaseInvoices PurchaseInvoice[]
@@ -126,28 +129,12 @@ model Tenant {
   stockAdjustments StockAdjustment[]
   inventoryAudits  InventoryAuditTrail[]
   media            Media[]
-
   
   systemLogs       SystemLog[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
-
-model Lead {
-  id              String   @id @default(uuid())
-  name            String
-  businessName    String
-  businessType    String
-  requirements    String
-  contactMethod   String
-  status          String   @default("NEW")
-  createdAt       DateTime @default(now())
-}
-
-// =============================================
-// MODULE: USERS & RBAC
-// =============================================
 
 model User {
   id        String   @id @default(uuid())
@@ -156,14 +143,15 @@ model User {
   password  String
   name      String
   avatar    String?
-  fcmToken  String?  // NEW: Firebase Cloud Messaging token for pushes
+  fcmToken  String?  
   role      Role
+  permissions Json?   // NEW: Granular permissions for staff [ "create_order", "delete_product" ]
   isActive  Boolean  @default(true)
-  status    String   @default("APPROVED") // PENDING, APPROVED, REJECTED
+  status    String   @default("APPROVED") 
   otpCode   String?
   otpExpiry DateTime?
   darkMode  Boolean  @default(true)
-  language  String   @default("EN") // NEW: EN or UR
+  language  String   @default("EN") 
   
   tenantId  String?
   tenant    Tenant?   @relation(fields: [tenantId], references: [id])
@@ -176,13 +164,12 @@ model User {
   orders    Order[]
   wallet    Wallet?
   employee  Employee?
-  notifications Notification[] // NEW
-  sentMessages Message[] @relation("SentMessages") // NEW
-  mediaFiles   Media[] // NEW: User's uploaded media
+  notifications Notification[] 
+  sentMessages Message[] @relation("SentMessages") 
+  mediaFiles   Media[] 
   activityLogs ActivityLog[]
   systemLogs   SystemLog[]
 
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
