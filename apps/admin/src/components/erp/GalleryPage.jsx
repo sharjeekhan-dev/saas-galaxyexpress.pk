@@ -1,6 +1,6 @@
 import React from 'react';
 import GalleryComponent from '../../../../shared/GalleryComponent.jsx';
-import { API } from '../App.jsx';
+import { API } from '../../App.jsx';
 
 export default function GalleryPage({ currentUser }) {
   const headers = {

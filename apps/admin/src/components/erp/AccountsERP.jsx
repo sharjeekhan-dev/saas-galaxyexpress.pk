@@ -4,7 +4,7 @@ import {
   ArrowUpRight, ArrowDownRight, CreditCard, Landmark, BookOpen 
 } from 'lucide-react';
 
-import { API } from '../App.jsx';
+import { API } from '../../App.jsx';
 
 export default function AccountsERP({ tenant, headers }) {
   const [subTab, setSubTab] = useState('dashboard');
