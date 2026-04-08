@@ -226,7 +226,7 @@ function LoginScreen({ onLogin }) {
             color: '#fff', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
           }}>
-            <Globe size={18} /> Login with Google
+             Login with Google
           </button>
         </form>
 
