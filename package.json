@@ -5,6 +5,7 @@
     "node": "18.x"
   },
   "dependencies": {
-    "@dataconnect/generated": "file:src/dataconnect-generated"
+    "@dataconnect/generated": "file:src/dataconnect-generated",
+    "lucide-react": "^1.7.0"
   }
 }

@@ -10,10 +10,10 @@ export default function GalleryPage({ currentUser }) {
 
   return (
     <div style={{ padding: 24, borderRadius: 20 }}>
-      <GalleryComponent 
-        API={API} 
-        headers={headers} 
-        user={currentUser} 
+      <GalleryComponent
+        API={API}
+        headers={headers}
+        user={currentUser}
       />
     </div>
   );
