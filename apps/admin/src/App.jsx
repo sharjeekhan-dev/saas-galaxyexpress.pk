@@ -467,7 +467,7 @@ export default function App() {
   }, []);
 
   if (!authed) return (
-    <LoginScreen onLogin={(data) => { setUser(data.user); setAuthed(true); }} />
+    <LoginScreen onLogin={(userData) => { setUser(userData); setAuthed(true); }} />
   );
   return (
     <AdminDashboard
