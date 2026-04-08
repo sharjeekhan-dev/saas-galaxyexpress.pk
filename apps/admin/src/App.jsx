@@ -132,7 +132,10 @@ function LoginScreen({ onLogin }) {
       }
 
       const userData = userDoc.data();
-      if (userData.role !== 'SUPER_ADMIN') {
+      // Added trimming and case-insensitivity to make login easier
+      const userRole = (userData.role || '').toString().trim().toUpperCase();
+      
+      if (userRole !== 'SUPER_ADMIN') {
         await signOut(auth);
         throw new Error('Unauthorized role for Admin Panel');
       }
