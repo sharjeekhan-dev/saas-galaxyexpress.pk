@@ -5,6 +5,9 @@ import {
   Factory, ShieldCheck, AlertTriangle, Trash2, ClipboardList 
 } from 'lucide-react';
 import { API } from '../App.jsx';
+import { db } from '../../../shared/firebase';
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+
 
 export default function InventoryERP({ vendor, theme }) {
   const [subTab, setSubTab] = useState('stock');
@@ -60,7 +63,21 @@ export default function InventoryERP({ vendor, theme }) {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [vendor]);
+  useEffect(() => { 
+    fetchData(); 
+
+    // LIVE STOCK LISTENER FROM FIREBASE
+    const q = query(collection(db, "stock"), where("tenantId", "==", vendor.tenantId || "default"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const stockData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setData(prev => ({ ...prev, stock: stockData }));
+    }, (error) => {
+      console.error("Firestore Listener Error:", error);
+    });
+
+    return () => unsub(); // Cleanup on unmount
+  }, [vendor]);
+
 
   const addLine = () => setFormData({ ...formData, lines: [...formData.lines, { productId: '', quantity: 1, rate: 0 }] });
   const removeLine = (idx) => setFormData({ ...formData, lines: formData.lines.filter((_, i) => i !== idx) });
