@@ -109,7 +109,7 @@ function GenericPage({ icon: Icon, title, subtitle }) {
 }
 
 import { auth, db } from './lib/firebase.js';
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { collection, doc, getDoc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 function LoginScreen({ onLogin }) {
@@ -140,9 +140,24 @@ function LoginScreen({ onLogin }) {
       onLogin(userData);
     } catch (err) {
       console.error("FULL LOGIN ERROR:", err);
-      // Show exact error message to user for debugging
       setError(err.code || err.message || 'Unknown Authentication Error');
     } finally { setLoading(false); }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      
+      if (!userDoc.exists()) {
+        throw new Error('User profile not found in database. Please contact admin.');
+      }
+      onLogin(userDoc.data());
+    } catch (err) {
+      setError(err.message || 'Google Sign-In failed');
+    }
   };
 
   return (
@@ -195,6 +210,20 @@ function LoginScreen({ onLogin }) {
             boxShadow: '0 8px 16px -4px rgba(57, 255, 20, 0.4)', fontSize: '1rem'
           }}>
             {loading ? 'Authenticating…' : 'Sign In To System →'}
+          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: 'rgba(255,255,255,0.3)' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }}></div>
+            <span style={{ padding: '0 10px', fontSize: '0.7rem' }}>OR CONTINUE WITH</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }}></div>
+          </div>
+
+          <button type="button" onClick={handleGoogleLogin} style={{
+            width: '100%', padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,0.05)',
+            color: '#fff', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10
+          }}>
+            <Globe size={18} /> Login with Google
           </button>
         </form>
 
