@@ -139,8 +139,9 @@ function LoginScreen({ onLogin }) {
 
       onLogin(userData);
     } catch (err) {
-      console.error(err);
-      setError(err.message || 'Authentication failed');
+      console.error("FULL LOGIN ERROR:", err);
+      // Show exact error message to user for debugging
+      setError(err.code || err.message || 'Unknown Authentication Error');
     } finally { setLoading(false); }
   };
 
