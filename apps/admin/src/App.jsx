@@ -168,7 +168,7 @@ function LoginScreen({ onLogin }) {
             background: 'linear-gradient(45deg, #39FF14, #8de02c)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
           }}>⚡</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>Partner Panel</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>Galaxy Express</h1>
           <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8, fontSize: '0.9rem' }}>partner.galaxyexpress.pk</p>
         </div>
 
@@ -221,7 +221,7 @@ function LoginScreen({ onLogin }) {
         </form>
 
         <div className="login-footer" style={{ textAlign: 'center', marginTop: 40, color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
-          Restricted Access · GalaxyERP v3.0 Production
+          Restricted Access · Galaxy Express v3.0 Production
         </div>
       </div>
     </div>

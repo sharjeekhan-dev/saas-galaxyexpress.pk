@@ -61,8 +61,8 @@ export default function App() {
   if (!vendor) {
     return (
       <LoginPage 
-        title="Vendor ERP Node" 
-        subtitle="Access your business control center" 
+        title="Galaxy Express Vendor" 
+        subtitle="Manage your business in real-time" 
         icon="🚀" 
         allowedRoles={['VENDOR_ADMIN', 'SUPER_ADMIN', 'MANAGER']}
         onSuccess={(data) => {
