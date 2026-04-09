@@ -10,7 +10,7 @@ import AccountsERP from './components/AccountsERP.jsx';
 import DailyClosingERP from './components/DailyClosingERP.jsx';
 import LoginPage from '../../../shared/LoginPage.jsx';
 
-export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function App() {
   const [vendor, setVendor] = useState(null); 

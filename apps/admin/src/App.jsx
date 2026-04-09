@@ -36,7 +36,7 @@ import AccountsERP from './components/erp/AccountsERP.jsx';
 import DailyClosingERP from './components/erp/DailyClosingERP.jsx';
 import MasterConfiguration from './components/erp/MasterConfiguration.jsx';
 
-export const API = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 export const headers = { 'Content-Type': 'application/json' }; // Dummy for compatibility
 
 // Headers helper now handles impersonation
