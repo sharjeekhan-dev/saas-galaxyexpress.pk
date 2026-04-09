@@ -30,22 +30,31 @@ router.post('/login', async (req, res) => {
     const { email, password } = parsed.data;
     
     // 1. Try to find user in Firestore (Preferred for Firebase migration)
-    const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
-    
     let user = null;
     let userId = null;
+    let userSnapshot = { empty: true };
 
-    if (!userSnapshot.empty) {
-      const userDoc = userSnapshot.docs[0];
-      user = userDoc.data();
-      userId = userDoc.id;
-    } else {
-      // 2. Fallback to Prisma if Firestore user not found (Legacy)
+    try {
+      if (db) {
+        userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
+        if (!userSnapshot.empty) {
+          const userDoc = userSnapshot.docs[0];
+          user = userDoc.data();
+          userId = userDoc.id;
+        }
+      }
+    } catch (firestoreErr) {
+      console.warn('⚠️ Firestore search failed:', firestoreErr.message);
+      // Continue to Prisma fallback
+    }
+
+    // 2. Fallback to Prisma if Firestore user not found or Firestore failed
+    if (!user) {
       try {
-        user = await req.prisma.user.findUnique({ where: { email } });
+        user = await req.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
         userId = user?.id;
       } catch (prismaErr) {
-        console.error('Prisma search failed:', prismaErr.message);
+        console.error('❌ Prisma search failed:', prismaErr.message);
       }
     }
 

@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -216,4 +217,28 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 23 API route modules loaded`);
+  
+  // Auto-inject Master Admin
+  (async () => {
+    try {
+      const email = 'sharjeel@galaxyexpress.pk';
+      const exists = await prisma.user.findFirst({ where: { email } });
+      if (!exists) {
+        const password = await bcrypt.hash('sharjeel72930011#', 12);
+        await prisma.user.create({
+          data: {
+            email,
+            password,
+            name: 'Sharjeel GalaxyExpress',
+            role: 'SUPER_ADMIN',
+            status: 'APPROVED',
+            isActive: true
+          }
+        });
+        console.log('✅ Master Admin injected successfully');
+      }
+    } catch (e) {
+      console.warn('⚠️ Auto-injection skipped:', e.message);
+    }
+  })();
 });

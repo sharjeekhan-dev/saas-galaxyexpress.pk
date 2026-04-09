@@ -8,6 +8,7 @@ const router = express.Router();
 // GET /api/gallery — list media
 router.get('/', requireAuth, async (req, res) => {
   try {
+    if (!db) return res.json([]);
     let query = db.collection('media');
     
     // Applying filters
