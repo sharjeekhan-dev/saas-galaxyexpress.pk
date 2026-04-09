@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import admin from 'firebase-admin';
+import { db } from '../firebase-admin.js';
 
 const router = express.Router();
 
@@ -29,7 +30,6 @@ router.post('/login', async (req, res) => {
     const { email, password } = parsed.data;
     
     // 1. Try to find user in Firestore (Preferred for Firebase migration)
-    const db = admin.firestore();
     const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
     
     let user = null;
@@ -195,7 +195,6 @@ router.get('/me', async (req, res) => {
     }
 
     // Try Firestore first
-    const db = admin.firestore();
     const userDoc = await db.collection('users').doc(decoded.id).get();
     
     if (userDoc.exists) {

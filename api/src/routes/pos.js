@@ -1,6 +1,7 @@
 import { requireAuth, requireTenant } from '../middlewares/auth.js';
 import { z } from 'zod';
 import admin from 'firebase-admin';
+import { db } from '../firebase-admin.js';
 
 const router = express.Router();
 
@@ -153,7 +154,6 @@ router.post('/orders', requireAuth, requireTenant, async (req, res) => {
 
     // 4. Sync to Firestore for real-time Dashboard access
     try {
-      const db = admin.firestore();
       await db.collection('orders').doc(order.id).set({
         ...order,
         createdAt: order.createdAt.toISOString(),
@@ -216,7 +216,6 @@ router.put('/orders/:id/status', requireAuth, requireTenant, async (req, res) =>
 
     // Update Firestore
     try {
-      const db = admin.firestore();
       await db.collection('orders').doc(order.id).update({ 
         status: order.status,
         updatedAt: order.updatedAt.toISOString()

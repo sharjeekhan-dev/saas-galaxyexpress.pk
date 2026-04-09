@@ -1,3 +1,4 @@
+import './firebase-admin.js'; // MUST BE FIRST TO INITIALIZE FIREBASE BEFORE ROUTES
 import express from 'express';
 import http from 'http';
 import { exec } from 'child_process';
@@ -13,12 +14,6 @@ import { PrismaClient } from '@prisma/client';
 dotenv.config();
 
 import admin from 'firebase-admin';
-try {
-  admin.initializeApp();
-  console.log('🔥 Firebase Admin Initialized');
-} catch (e) {
-  console.warn('⚠️ Firebase Admin failed to initialize:', e.message);
-}
 
 const app = express();
 const server = http.createServer(app);

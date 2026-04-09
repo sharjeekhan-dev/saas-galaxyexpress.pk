@@ -1,9 +1,9 @@
 import express from 'express';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
 import admin from 'firebase-admin';
+import { db } from '../firebase-admin.js';
 
 const router = express.Router();
-const db = admin.firestore();
 
 // GET /api/gallery — list media
 router.get('/', requireAuth, async (req, res) => {
