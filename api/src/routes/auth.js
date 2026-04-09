@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import admin from 'firebase-admin';
 
 const router = express.Router();
 
@@ -28,7 +29,6 @@ router.post('/login', async (req, res) => {
     const { email, password } = parsed.data;
     
     // 1. Try to find user in Firestore (Preferred for Firebase migration)
-    const admin = (await import('firebase-admin')).default;
     const db = admin.firestore();
     const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
     
@@ -185,14 +185,16 @@ router.get('/me', async (req, res) => {
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (e) {
-      // Fallback: try to verify as Firebase token
-      const admin = (await import('firebase-admin')).default;
+    // Fallback: try to verify as Firebase token
+    try {
       decoded = await admin.auth().verifyIdToken(token);
       decoded.id = decoded.uid; // normalization
+    } catch (e) {
+      return res.status(401).json({ error: 'Auth failed: Token is neither valid JWT nor Firebase' });
+    }
     }
 
     // Try Firestore first
-    const admin = (await import('firebase-admin')).default;
     const db = admin.firestore();
     const userDoc = await db.collection('users').doc(decoded.id).get();
     

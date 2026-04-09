@@ -8,12 +8,16 @@ import MasterConfiguration from './components/MasterConfiguration.jsx';
 import InventoryERP from './components/InventoryERP.jsx';
 import AccountsERP from './components/AccountsERP.jsx';
 import DailyClosingERP from './components/DailyClosingERP.jsx';
+import { db, auth } from './lib/firebase.js'; 
+import { onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
+import { useAuth } from '../../../shared/AuthContext.jsx';
 import LoginPage from '../../../shared/LoginPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function App() {
-  const [vendor, setVendor] = useState(null); 
+  const { user: vendor, loading: authLoading, logout, isAuthenticated } = useAuth();
+  
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('orders');
   const [reportTab, setReportTab] = useState('gallery');
@@ -22,20 +26,21 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [outlets, setOutlets] = useState([]);
   const [activeOutletId, setActiveOutletId] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [previewMode, setPreviewMode] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
 
-  // Auth & Initial Data Link
   useEffect(() => {
-    const savedUser = localStorage.getItem('erp_user');
-    const token = localStorage.getItem('erp_token');
-    if (savedUser && token) {
-      const u = JSON.parse(savedUser);
-      setVendor(u);
+    if (vendor) {
       setCurrentUser({
-        id: u.id, name: u.name, role: u.role,
-        permissions: ['SUPER_ADMIN', 'VENDOR_ADMIN'].includes(u.role) ? ['ALL'] : ['pos', 'orders']
+        id: vendor.uid || vendor.id,
+        name: vendor.name,
+        role: vendor.role,
+        permissions: ['SUPER_ADMIN', 'VENDOR_ADMIN'].includes(vendor.role) ? ['ALL'] : ['pos', 'orders']
       });
     }
-  }, []);
+  }, [vendor]);
 
   const fetchOutlets = async () => {
     if (!vendor) return;
@@ -303,42 +308,48 @@ export default function App() {
     else localStorage.removeItem('vendor_auth');
   }, [vendor]);
 
-  // Live Data Synchronization
-  const fetchOrders = async () => {
-    if (!vendor) return;
-    setIsFetchingOrders(true);
-    try {
-      const res = await fetch(`${API}/api/pos/orders${activeOutletId ? `?outletId=${activeOutletId}` : ''}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setOrders(data.map(o => ({
-            id: o.id,
-            customer: o.customerInfo?.name || 'Walk-in',
-            contact: o.customerInfo?.phone || '',
-            items: o.items?.map(i => `${i.quantity}x ${i.product?.name || 'Item'}`).join(', '),
-            total: o.totalAmount,
-            status: o.status.toLowerCase(),
-            time: new Date(o.createdAt).toLocaleTimeString(),
-            source: o.type
-          })));
-        }
-      }
-    } catch (e) {
-      console.error("Order fetch error", e);
-    } finally {
-      setIsFetchingOrders(false);
-    }
-  };
-
+  // Live Data Synchronization via Firestore (Instead of polling)
   useEffect(() => {
-    let alive = true;
-    if (vendor && alive) fetchOrders();
-    const interval = setInterval(() => { if (vendor && alive) fetchOrders(); }, 5000);
-    return () => { alive = false; clearInterval(interval); };
-  }, [vendor]);
+    if (!vendor) return;
+
+    let q = query(collection(db, 'orders'), where('tenantId', '==', vendor.tenantId || vendor.id));
+    if (activeOutletId) {
+      q = query(collection(db, 'orders'), 
+        where('tenantId', '==', vendor.tenantId || vendor.id),
+        where('outletId', '==', activeOutletId),
+        orderBy('createdAt', 'desc')
+      );
+    } else {
+      q = query(collection(db, 'orders'), 
+        where('tenantId', '==', vendor.tenantId || vendor.id),
+        orderBy('createdAt', 'desc')
+      );
+    }
+
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(doc => {
+        const o = doc.data();
+        return {
+          id: doc.id,
+          customer: o.customerInfo?.name || 'Walk-in',
+          contact: o.customerInfo?.phone || '',
+          items: o.items?.map(i => `${i.quantity}x ${i.product?.name || 'Item'}`).join(', '),
+          total: o.totalAmount,
+          status: o.status,
+          time: new Date(o.createdAt).toLocaleTimeString(),
+          source: o.type,
+          ...o
+        };
+      });
+      setOrders(data);
+      setIsFetchingOrders(false);
+    }, (err) => {
+      console.error("Order listener error:", err);
+      setIsFetchingOrders(false);
+    });
+
+    return () => unsub();
+  }, [vendor, activeOutletId]);
 
   const updateOrderStatus = async (orderId, newStatus) => {
     setProcessingId(orderId);
@@ -442,14 +453,24 @@ export default function App() {
   const [reviews, setReviews] = useState([]);
   const [applications, setApplications] = useState([]);
 
-  if (!vendor) {
-    return <LoginPage 
-             title="ERP Vendor Portal" 
-             subtitle="erp.galaxyexpress.pk" 
-             icon={<Store size={48} color="#8de02c" />} 
-             onSuccess={(data) => setVendor({ ...data.user, id: data.user.tenantId || data.user.id })} 
-             allowedRoles={['VENDOR', 'VENDOR_ADMIN', 'SUPER_ADMIN', 'CASHIER']} 
-           />;
+  if (authLoading) return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#020817', color: '#fff' }}>
+        <RefreshCw size={48} color="#39FF14" className="spin" />
+        <p style={{ marginTop: 20, fontWeight: 700, letterSpacing: 1 }}>SYNCHRONIZING SECURE SESSION...</p>
+        <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (!isAuthenticated) {
+    return (
+      <LoginPage 
+        title="Vendor ERP Cloud" 
+        subtitle="Secure Node Access — erp.galaxyexpress.pk" 
+        icon={<Store size={48} color="#39FF14" />} 
+        allowedRoles={['VENDOR_ADMIN', 'SUPER_ADMIN', 'MANAGER', 'CASHIER', 'VENDOR']}
+        onSuccess={() => {}} // AuthContext will handle state update
+      />
+    );
   }
 
   // --- REPORT PREVIEW MODAL (INVOICE / FAST PRINT) ---
@@ -671,7 +692,7 @@ export default function App() {
         </nav>
 
         <div style={{ padding: 20, borderTop: `1px solid ${theme.border}` }}>
-          <div onClick={() => setVendor(null)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}>
+          <div onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', color: '#ef4444', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' }}>
             <LogOut size={16} /> Sign Out Securely
           </div>
         </div>

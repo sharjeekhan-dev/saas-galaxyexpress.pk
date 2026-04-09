@@ -109,9 +109,8 @@ function GenericPage({ icon: Icon, title, subtitle }) {
   );
 }
 
-import { auth, db } from './lib/firebase.js';
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { collection, doc, getDoc, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { db } from './lib/firebase.js';
+import { useAuth } from '../../../shared/AuthContext.jsx';
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -119,29 +118,19 @@ function LoginScreen({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const { login } = useAuth();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) return setError('Credentials required');
     setError('');
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const user = await login(email, password);
       
-      if (!userDoc.exists()) {
-        throw new Error('User profile not found in database');
-      }
-
-      const userData = userDoc.data();
-      // Added trimming and case-insensitivity to make login easier
-      const userRole = (userData.role || '').toString().trim().toUpperCase();
-      
-      if (userRole !== 'SUPER_ADMIN') {
-        await signOut(auth);
-        throw new Error('Unauthorized role for Admin Panel');
-      }
-
-      onLogin(userData);
+      // Verification of role after login (the hook handles the profile fetch)
+      // But we can add a small delay or check here if needed. 
+      // The useAuth hook will eventually update the UI.
     } catch (err) {
       console.error("FULL LOGIN ERROR:", err);
       setError(err.code || err.message || 'Unknown Authentication Error');
@@ -473,44 +462,34 @@ function AdminDashboard({ user, onLogout }) {
 
 // ─── APP ENTRY ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [authed, setAuthed] = useState(false);
-  const [user, setUser] = useState(null);
+  const { user, loading, logout, isAuthenticated, isAdmin } = useAuth();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Fetch additional role data from Firestore
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          if (userData.role === 'SUPER_ADMIN') {
-            setUser(userData);
-            setAuthed(true);
-          } else {
-            await signOut(auth);
-            setAuthed(false);
-          }
-        }
-      } else {
-        setAuthed(false);
-        setUser(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  if (!authed) return (
-    <LoginScreen onLogin={(userData) => { setUser(userData); setAuthed(true); }} />
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#000' }}>
+      <RefreshCw size={48} color="#39FF14" className="spin" />
+      <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+    </div>
   );
+
+  if (!isAuthenticated) return (
+    <LoginScreen />
+  );
+
+  if (!isAdmin) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#000', color: '#fff' }}>
+        <Shield size={64} color="#ef4444" style={{ marginBottom: 20 }} />
+        <h1>Access Denied</h1>
+        <p>This panel is restricted to Super Admins only.</p>
+        <button onClick={logout} style={{ marginTop: 20, padding: '10px 20px', background: '#39FF14', color: '#000', borderRadius: 8, border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Logout</button>
+      </div>
+    );
+  }
+
   return (
     <AdminDashboard
       user={user}
-      onLogout={async () => {
-        await signOut(auth);
-        setAuthed(false); 
-        setUser(null);
-      }}
+      onLogout={logout}
     />
   );
 }

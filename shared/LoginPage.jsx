@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import gsap from 'gsap';
+import { auth, db } from './firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 /**
  * Shared LoginPage component for all frontend modules.
@@ -33,23 +36,24 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
-      });
-      const data = await res.json();
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const user = userCredential.user;
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!userDoc.exists()) {
+        throw new Error('User profile not found in database');
       }
 
-      if (data.user.role !== 'SUPER_ADMIN' && allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(data.user.role)) {
+      const userData = userDoc.data();
+      
+      // Role check
+      if (userData.role !== 'SUPER_ADMIN' && allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userData.role)) {
         throw new Error('Access denied: Unauthorized role for this application');
       }
 
-      localStorage.setItem('erp_token', data.token);
-      localStorage.setItem('erp_user', JSON.stringify(data.user));
+      const token = await user.getIdToken();
+      localStorage.setItem('erp_token', token);
+      localStorage.setItem('erp_user', JSON.stringify({ uid: user.uid, ...userData }));
 
       gsap.to('.login-card', {
         scale: 1.1,
@@ -57,11 +61,12 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
         blur: 10,
         duration: 0.5,
         onComplete: () => {
-          if (onSuccess) onSuccess(data);
+          if (onSuccess) onSuccess({ user: { uid: user.uid, ...userData }, token });
         }
       });
     } catch (err) {
-      setError(err.message || 'Unable to connect to server');
+      console.error("Login Error:", err);
+      setError(err.code === 'auth/invalid-credential' ? 'Invalid email or password' : (err.message || 'Login failed'));
     } finally {
       setLoading(false);
     }

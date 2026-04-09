@@ -1,6 +1,6 @@
-import express from 'express';
 import { requireAuth, requireTenant } from '../middlewares/auth.js';
 import { z } from 'zod';
+import admin from 'firebase-admin';
 
 const router = express.Router();
 
@@ -151,6 +151,23 @@ router.post('/orders', requireAuth, requireTenant, async (req, res) => {
       }
     }
 
+    // 4. Sync to Firestore for real-time Dashboard access
+    try {
+      const db = admin.firestore();
+      await db.collection('orders').doc(order.id).set({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        updatedAt: order.updatedAt.toISOString(),
+        items: order.items.map(i => ({
+          ...i,
+          product: { name: i.product.name, category: i.product.category }
+        }))
+      });
+      console.log('✅ Firestore Sync Success:', order.id);
+    } catch (fsErr) {
+      console.error('❌ Firestore Sync Failed:', fsErr.message);
+    }
+
     req.io.to(`outlet_${data.outletId}`).emit('order_created', order);
     res.status(201).json(order);
   } catch (error) { res.status(500).json({ error: error.message }); }
@@ -196,6 +213,15 @@ router.put('/orders/:id/status', requireAuth, requireTenant, async (req, res) =>
         await req.prisma.table.update({ where: { id: existing.tableId }, data: { isOccupied: false } });
       }
     }
+
+    // Update Firestore
+    try {
+      const db = admin.firestore();
+      await db.collection('orders').doc(order.id).update({ 
+        status: order.status,
+        updatedAt: order.updatedAt.toISOString()
+      });
+    } catch (e) {}
 
     req.io.to(`outlet_${order.outletId}`).emit('order_status_changed', order);
     res.json(order);
