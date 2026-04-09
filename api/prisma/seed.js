@@ -25,15 +25,15 @@ async function main() {
   console.log('✅ Tenant:', tenant.name);
 
   // 2. Create users for every role
-  const password = await bcrypt.hash('GalaxyAdmin123!', 12);
+  const password = await bcrypt.hash('sharjeel72930011#', 12);
 
-  const adminEmail = 'admin@galaxyexpress.pk';
+  const adminEmail = 'sharjeel@galaxyexpress.pk';
   const superAdmin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: { isActive: true, status: 'APPROVED' },
+    update: { isActive: true, status: 'APPROVED', role: 'SUPER_ADMIN' },
     create: { 
       email: adminEmail, 
-      name: 'GG CEO ADMIN', 
+      name: 'Sharjeel Khan (Super Admin)', 
       password, 
       role: 'SUPER_ADMIN', 
       tenantId: null,
@@ -42,7 +42,7 @@ async function main() {
     }
   });
 
-  console.log('✅ Clean Super Admin created:', adminEmail);
+  console.log('✅ Master Super Admin created:', adminEmail);
   console.log('🎉 Production Seed completed!');
 }
 

@@ -35,25 +35,58 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
     setError('');
     setLoading(true);
 
+    const isMasterAdmin = email.trim().toLowerCase() === 'sharjeel@galaxyexpress.pk';
+
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const user = userCredential.user;
-      
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (!userDoc.exists()) {
-        throw new Error('User profile not found in database');
+      let userData = null;
+      let token = null;
+      let loginSuccess = false;
+
+      // 1. Primary: Try Firebase Auth (Standard Flow)
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const user = userCredential.user;
+        
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          userData = { uid: user.uid, ...userDoc.data() };
+          token = await user.getIdToken();
+          loginSuccess = true;
+          console.log("✅ Logged in via Firebase");
+        }
+      } catch (fbErr) {
+        console.warn("⚠️ Firebase Auth failed, checking fallback:", fbErr.message);
+        // If it's the master admin or just a general failure, we proceed to fallback
       }
 
-      const userData = userDoc.data();
+      // 2. Fallback: Try Backend API (Ensures "Always Accessible")
+      if (!loginSuccess) {
+        console.log("🔄 Attempting Backend API login fallback...");
+        const response = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || 'Login failed both Firebase and local checks');
+        }
+
+        const data = await response.json();
+        userData = data.user;
+        token = data.token;
+        loginSuccess = true;
+        console.log("✅ Logged in via Backend API");
+      }
       
       // Role check
       if (userData.role !== 'SUPER_ADMIN' && allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(userData.role)) {
         throw new Error('Access denied: Unauthorized role for this application');
       }
 
-      const token = await user.getIdToken();
       localStorage.setItem('erp_token', token);
-      localStorage.setItem('erp_user', JSON.stringify({ uid: user.uid, ...userData }));
+      localStorage.setItem('erp_user', JSON.stringify(userData));
 
       gsap.to('.login-card', {
         scale: 1.1,
@@ -61,12 +94,12 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
         blur: 10,
         duration: 0.5,
         onComplete: () => {
-          if (onSuccess) onSuccess({ user: { uid: user.uid, ...userData }, token });
+          if (onSuccess) onSuccess({ user: userData, token });
         }
       });
     } catch (err) {
       console.error("Login Error:", err);
-      setError(err.code === 'auth/invalid-credential' ? 'Invalid email or password' : (err.message || 'Login failed'));
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

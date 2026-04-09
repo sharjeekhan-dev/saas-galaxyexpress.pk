@@ -80,8 +80,12 @@ export const AuthProvider = ({ children }) => {
           setLoading(false);
         }
       } else {
-        setUser(null);
-        localStorage.removeItem('erp_token');
+        // Only clear if we don't already have a local/master session active
+        const hasLocalSession = localStorage.getItem('erp_user');
+        if (!hasLocalSession) {
+          setUser(null);
+          localStorage.removeItem('erp_token');
+        }
         setLoading(false);
       }
     });
@@ -92,9 +96,49 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
+    const masterEmail = 'sharjeel@galaxyexpress.pk';
+
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-      return userCredential.user;
+      let firebaseUser = null;
+      let loginSuccess = false;
+
+      // 1. Try Firebase Auth first
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        firebaseUser = userCredential.user;
+        loginSuccess = true;
+      } catch (fbErr) {
+        console.warn("⚠️ Firebase Auth failed, falling back to local API:", fbErr.message);
+      }
+
+      // 2. Fallback to Local API Login (Crucial for "Always Accessible" requirement)
+      // We always trigger this if Firebase fails, OR for the master account specifically to ensure reliability.
+      if (!loginSuccess || email.trim().toLowerCase() === masterEmail) {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const localUser = {
+            uid: data.user.id || 'master-local-session',
+            ...data.user
+          };
+          setUser(localUser);
+          localStorage.setItem('erp_token', data.token);
+          localStorage.setItem('erp_user', JSON.stringify(localUser));
+          setLoading(false);
+          return localUser;
+        } else if (!loginSuccess) {
+          // If both failed, then throw
+          const errData = await response.json();
+          throw new Error(errData.error || 'Authentication Failed');
+        }
+      }
+
+      return firebaseUser;
     } catch (err) {
       setError(err.message);
       throw err;
@@ -102,6 +146,19 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // If we have a local session saved, use it as initial state
+    const savedUser = localStorage.getItem('erp_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+        setLoading(false);
+      } catch (e) {
+        localStorage.removeItem('erp_user');
+      }
+    }
+  }, []);
 
   const logout = async () => {
     try {
