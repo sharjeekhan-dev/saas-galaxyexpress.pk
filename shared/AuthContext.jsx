@@ -23,14 +23,26 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // 1. Initial Check: Try to recover local session immediately (Ensures Zero-Latency for Master Admin)
+    const localUserJson = localStorage.getItem('erp_user');
+    if (localUserJson) {
+      try {
+        const localUser = JSON.parse(localUserJson);
+        setUser(localUser);
+        console.log("💾 Recovered session from local storage");
+      } catch (e) {
+        console.warn("⚠️ Failed to parse local session:", e);
+      }
+    }
+
     // Force session persistence
     setPersistence(auth, browserSessionPersistence).catch(err => console.error("Persistence error:", err));
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       setError(null);
       
       if (firebaseUser) {
+        setLoading(true);
         try {
           // Get additional user data from Firestore
           const userDocRef = doc(db, 'users', firebaseUser.uid);
