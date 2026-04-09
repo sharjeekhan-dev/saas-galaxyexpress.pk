@@ -105,52 +105,43 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (credentials) => {
     setLoading(true);
     setError(null);
-    const masterEmail = 'sharjeel@galaxyexpress.pk';
+    const { email, phone, password } = credentials;
 
     try {
-      let firebaseUser = null;
-      let loginSuccess = false;
+      // 1. PRIMARY: Try Local API Login (Custom Backend)
+      // This is now the source of truth for all users including Master Admin.
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email?.trim(), phone, password })
+      });
 
-      // 1. Try Firebase Auth first
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
-        firebaseUser = userCredential.user;
-        loginSuccess = true;
-      } catch (fbErr) {
-        console.warn("⚠️ Firebase Auth failed, falling back to local API:", fbErr.message);
-      }
-
-      // 2. Fallback to Local API Login (Crucial for "Always Accessible" requirement)
-      // We always trigger this if Firebase fails, OR for the master account specifically to ensure reliability.
-      if (!loginSuccess || email.trim().toLowerCase() === masterEmail) {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const localUser = {
-            uid: data.user.id || 'master-local-session',
-            ...data.user
-          };
-          setUser(localUser);
-          localStorage.setItem('erp_token', data.token);
-          localStorage.setItem('erp_user', JSON.stringify(localUser));
-          setLoading(false);
-          return localUser;
-        } else if (!loginSuccess) {
-          // If both failed, then throw
-          const errData = await response.json();
-          throw new Error(errData.error || 'Authentication Failed');
+      if (response.ok) {
+        const data = await response.json();
+        const localUser = {
+          uid: data.user.id || 'master-local-session',
+          ...data.user
+        };
+        setUser(localUser);
+        localStorage.setItem('erp_token', data.token);
+        localStorage.setItem('erp_user', JSON.stringify(localUser));
+        
+        // Optional: Sync with Firebase Auth for real-time features if needed
+        if (email) {
+          signInWithEmailAndPassword(auth, email.trim(), password).catch(e => 
+            console.warn("🔐 Firebase sync skipped:", e.message)
+          );
         }
-      }
 
-      return firebaseUser;
+        setLoading(false);
+        return localUser;
+      } else {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Authentication Failed');
+      }
     } catch (err) {
       setError(err.message);
       throw err;
@@ -191,7 +182,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'SUPER_ADMIN',
-    isVendor: user?.role === 'VENDOR' || user?.role === 'VENDOR_ADMIN'
+    isTenantAdmin: user?.role === 'TENANT_ADMIN',
+    isVendor: user?.role === 'VENDOR',
+    isStaff: ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN'].includes(user?.role)
   };
 
   return (

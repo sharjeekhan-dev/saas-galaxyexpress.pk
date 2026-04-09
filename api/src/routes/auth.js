@@ -8,8 +8,12 @@ import { db } from '../firebase-admin.js';
 const router = express.Router();
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
   password: z.string().min(6),
+}).refine(data => data.email || data.phone, {
+  message: "Either email or phone must be provided",
+  path: ["email"]
 });
 
 const registerSchema = z.object({
@@ -27,34 +31,35 @@ router.post('/login', async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
 
-    const { email, password } = parsed.data;
+    const { email, phone, password } = parsed.data;
     
-    // 1. Try to find user in Firestore (Preferred for Firebase migration)
+    // 1. Try to find user in Prisma (Custom Backend - Primary)
     let user = null;
     let userId = null;
-    let userSnapshot = { empty: true };
 
     try {
-      if (db) {
-        userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
+      const where = email ? { email: email.toLowerCase() } : { phone };
+      user = await req.prisma.user.findUnique({ where });
+      if (user) {
+        userId = user.id;
+        console.log(`✅ User found in Prisma: ${email || phone}`);
+      }
+    } catch (prismaErr) {
+      console.error('❌ Prisma search failed:', prismaErr.message);
+    }
+
+    // 2. Fallback to Firestore (Secondary/Migration mode)
+    if (!user && db && email) {
+      try {
+        const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
         if (!userSnapshot.empty) {
           const userDoc = userSnapshot.docs[0];
           user = userDoc.data();
           userId = userDoc.id;
+          console.log(`📡 User found in Firestore fallback: ${email}`);
         }
-      }
-    } catch (firestoreErr) {
-      console.warn('⚠️ Firestore search failed:', firestoreErr.message);
-      // Continue to Prisma fallback
-    }
-
-    // 2. Fallback to Prisma if Firestore user not found or Firestore failed
-    if (!user) {
-      try {
-        user = await req.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-        userId = user?.id;
-      } catch (prismaErr) {
-        console.error('❌ Prisma search failed:', prismaErr.message);
+      } catch (firestoreErr) {
+        console.warn('⚠️ Firestore fallback failed:', firestoreErr.message);
       }
     }
 

@@ -241,23 +241,28 @@ server.listen(PORT, '0.0.0.0', () => {
   (async () => {
     try {
       const email = 'sharjeel@galaxyexpress.pk';
-      const exists = await prisma.user.findFirst({ where: { email } });
-      if (!exists) {
-        const password = await bcrypt.hash('sharjeel72930011#', 12);
-        await prisma.user.create({
-          data: {
-            email,
-            password,
-            name: 'Sharjeel GalaxyExpress',
-            role: 'SUPER_ADMIN',
-            status: 'APPROVED',
-            isActive: true
-          }
-        });
-        console.log('✅ Master Admin injected successfully');
-      }
+      const password = await bcrypt.hash('sharjeel72930011#', 12);
+      
+      await prisma.user.upsert({
+        where: { email },
+        update: {
+          password,
+          role: 'SUPER_ADMIN',
+          status: 'APPROVED',
+          isActive: true
+        },
+        create: {
+          email,
+          password,
+          name: 'Sharjeel - Galaxy Express Super Admin',
+          role: 'SUPER_ADMIN',
+          status: 'APPROVED',
+          isActive: true
+        }
+      });
+      console.log('💎 GALAXY EXPRESS: Master Admin account secured and ready.');
     } catch (e) {
-      console.warn('⚠️ Auto-injection skipped:', e.message);
+      console.warn('⚠️ Auto-injection warning:', e.message);
     }
   })();
 });
