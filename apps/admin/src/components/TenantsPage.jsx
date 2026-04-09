@@ -3,7 +3,7 @@ import {
   Building, Plus, Edit, XCircle, X, Check, Shield, 
   ToggleLeft, ToggleRight, Calendar, Package, Users, Store, Laptop, BarChart3, Receipt
 } from 'lucide-react';
-import { db } from '../lib/firebase.js';
+import { db } from '@shared/firebase.js';
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 
 const PLAN_COLOR = { BASIC: 'badge-default', PRO: 'badge-cyan', ENTERPRISE: 'badge-purple' };

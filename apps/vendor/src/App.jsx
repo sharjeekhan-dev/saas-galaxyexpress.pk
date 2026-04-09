@@ -8,10 +8,10 @@ import MasterConfiguration from './components/MasterConfiguration.jsx';
 import InventoryERP from './components/InventoryERP.jsx';
 import AccountsERP from './components/AccountsERP.jsx';
 import DailyClosingERP from './components/DailyClosingERP.jsx';
-import { db, auth } from './lib/firebase.js'; 
+import { db, auth } from '@shared/firebase.js'; 
 import { onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
-import { useAuth } from '../../../shared/AuthContext.jsx';
-import LoginPage from '../../../shared/LoginPage.jsx';
+import { useAuth } from '@shared/AuthContext.jsx';
+import LoginPage from '@shared/LoginPage.jsx';
 
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -1230,7 +1230,7 @@ export default function App() {
                             </div>
                             <div>
                               <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Receive To (Stock Location)</label>
-                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
                                 <option>Main Store (HQ)</option>
                                 <option>Kitchen Cold Storage</option>
                               </select>
@@ -1241,14 +1241,14 @@ export default function App() {
                           <>
                             <div>
                               <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Source Location (Issue From)</label>
-                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#f97316', boxSizing: 'border-box', borderLeft: '4px solid #f97316' }}>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#f97316', boxSizing: 'border-box', borderLeft: '4px solid #f97316' }}>
                                 <option>Main Store (HQ)</option>
                                 <option>Warehouse B</option>
                               </select>
                             </div>
                             <div>
                               <label style={{ display: 'block', marginBottom: 6, fontSize: '0.85rem', color: theme.muted, fontWeight: 700 }}>Destination Dept. / Project</label>
-                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
+                              <select style={{ width: '100%', padding: '12px 16px', borderRadius: 8, background: theme.bg, border: `1px solid ${theme.border}`, outline: 'none', fontWeight: 800, color: '#39FF14', boxSizing: 'border-box', borderLeft: '4px solid #39FF14' }}>
                                 <option>Fast Food Department</option>
                                 <option>BBQ & Grill</option>
                               </select>
@@ -1778,10 +1778,3 @@ export default function App() {
     </div>
   );
 }
-
-const Image = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-);
-const RefreshCw = ({ size, color }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-);

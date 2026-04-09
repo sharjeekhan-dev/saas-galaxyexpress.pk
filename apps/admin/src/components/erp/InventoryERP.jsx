@@ -4,7 +4,7 @@ import {
   Plus, Printer, CheckCircle, Clock, X, Save, Search, 
   Factory, ShieldCheck, AlertTriangle, Trash2, ClipboardList 
 } from 'lucide-react';
-import { db } from '../../lib/firebase.js';
+import { db } from '@shared/firebase.js';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
 
 export default function InventoryERP({ tenant, headers }) {

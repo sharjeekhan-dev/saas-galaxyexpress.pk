@@ -4,7 +4,7 @@ import {
   ChevronDown, Download, Filter, Search, Printer, FileText,
   Clock, CheckCircle, Truck, XCircle, MoreHorizontal
 } from 'lucide-react';
-import { db } from '../lib/firebase.js';
+import { db } from '@shared/firebase.js';
 import { doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 const STATUS_MAP = {

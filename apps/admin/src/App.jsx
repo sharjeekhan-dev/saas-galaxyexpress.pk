@@ -109,8 +109,8 @@ function GenericPage({ icon: Icon, title, subtitle }) {
   );
 }
 
-import { db } from './lib/firebase.js';
-import { useAuth } from '../../../shared/AuthContext.jsx';
+import { db } from '@shared/firebase.js';
+import { useAuth } from '@shared/AuthContext.jsx';
 
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState('');

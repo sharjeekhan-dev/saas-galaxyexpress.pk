@@ -5,7 +5,7 @@ import {
   Factory, ShieldCheck, AlertTriangle, Trash2, ClipboardList 
 } from 'lucide-react';
 import { API } from '../App.jsx';
-import { db } from '../../../shared/firebase';
+import { db } from '@shared/firebase';
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 

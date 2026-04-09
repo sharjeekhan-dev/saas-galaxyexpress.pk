@@ -1,5 +1,5 @@
 import React from 'react';
-import GalleryComponent from '../../../../shared/GalleryComponent.jsx';
+import GalleryComponent from '@shared/GalleryComponent.jsx';
 import { API } from '../App.jsx';
 
 export default function GalleryPage({ user }) {
