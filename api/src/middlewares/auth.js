@@ -1,14 +1,38 @@
 import jwt from 'jsonwebtoken';
+import admin from 'firebase-admin';
 
-export const requireAuth = (req, res, next) => {
+export const requireAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized: No token provided' });
     }
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    
+    // 1. Try regular JWT
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = decoded;
+    } catch (jwtErr) {
+      // 2. Try Firebase ID Token
+      if (admin.apps.length > 0) {
+        try {
+          const decodedFirebase = await admin.auth().verifyIdToken(token);
+          req.user = {
+            id: decodedFirebase.uid,
+            email: decodedFirebase.email,
+            name: decodedFirebase.name || decodedFirebase.email,
+            role: decodedFirebase.role || 'CUSTOMER', // Assuming role is in custom claims
+            tenantId: decodedFirebase.tenantId || null
+          };
+          console.log('✅ Firebase Auth success for:', decodedFirebase.email);
+        } catch (fbErr) {
+          return res.status(401).json({ error: 'Unauthorized: Invalid token (JWT/Firebase)' });
+        }
+      } else {
+        return res.status(401).json({ error: 'Unauthorized: Invalid token and Firebase not initialized' });
+      }
+    }
 
     // Handle Super Admin Impersonation
     const impersonatedTenantId = req.headers['x-impersonate-tenant'];

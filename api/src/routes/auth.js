@@ -26,29 +26,64 @@ router.post('/login', async (req, res) => {
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
 
     const { email, password } = parsed.data;
-    const user = await req.prisma.user.findUnique({ where: { email } });
+    
+    // 1. Try to find user in Firestore (Preferred for Firebase migration)
+    const admin = (await import('firebase-admin')).default;
+    const db = admin.firestore();
+    const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
+    
+    let user = null;
+    let userId = null;
+
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0];
+      user = userDoc.data();
+      userId = userDoc.id;
+    } else {
+      // 2. Fallback to Prisma if Firestore user not found (Legacy)
+      try {
+        user = await req.prisma.user.findUnique({ where: { email } });
+        userId = user?.id;
+      } catch (prismaErr) {
+        console.error('Prisma search failed:', prismaErr.message);
+      }
+    }
+
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
     if (user.status === 'PENDING') return res.status(403).json({ error: 'Your account is pending approval from the Super Admin.' });
     if (user.status === 'REJECTED') return res.status(403).json({ error: 'Your account request was rejected.' });
-    if (!user.isActive) return res.status(403).json({ error: 'Account is deactivated' });
+    if (user.isActive === false) return res.status(403).json({ error: 'Account is deactivated' });
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+    // Validate password (both sources assume bcrypt or similar)
+    // NOTE: For purely Firebase users, this check might fail if they don't have a 'password' field in Firestore.
+    // However, the migration usually preserves the hash.
+    if (user.password) {
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
+    } else {
+      // If no password in Firestore/Prisma, we assume they must use Social Login or Firebase SDK directly.
+      return res.status(401).json({ error: 'This account requires Social Login' });
+    }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, tenantId: user.tenantId },
+      { id: userId, role: user.role, tenantId: user.tenantId },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // Log login
-    await req.prisma.systemLog.create({ data: { userId: user.id, tenantId: user.tenantId, action: 'LOGIN', details: `${user.role} login` } }).catch(() => {});
+    // Log login (Silent failure)
+    try {
+      await db.collection('systemLogs').add({ userId, tenantId: user.tenantId, action: 'LOGIN', details: `${user.role} login via bridge`, createdAt: new Date().toISOString() });
+    } catch (e) {}
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, tenantId: user.tenantId, darkMode: user.darkMode, avatar: user.avatar }
+      user: { id: userId, name: user.name, email: user.email, role: user.role, tenantId: user.tenantId, darkMode: user.darkMode, avatar: user.avatar }
     });
-  } catch (err) { res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { 
+    console.error('Login Error:', err);
+    res.status(500).json({ error: 'Internal server error: ' + err.message }); 
+  }
 });
 
 // POST /api/auth/register
@@ -146,14 +181,37 @@ router.get('/me', async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: 'No token' });
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await req.prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, name: true, email: true, phone: true, role: true, tenantId: true, avatar: true, darkMode: true }
-    });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
-  } catch { res.status(401).json({ error: 'Invalid token' }); }
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (e) {
+      // Fallback: try to verify as Firebase token
+      const admin = (await import('firebase-admin')).default;
+      decoded = await admin.auth().verifyIdToken(token);
+      decoded.id = decoded.uid; // normalization
+    }
+
+    // Try Firestore first
+    const admin = (await import('firebase-admin')).default;
+    const db = admin.firestore();
+    const userDoc = await db.collection('users').doc(decoded.id).get();
+    
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      return res.json({ id: userDoc.id, ...userData });
+    }
+
+    // Try Prisma fallback
+    try {
+      const user = await req.prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, name: true, email: true, phone: true, role: true, tenantId: true, avatar: true, darkMode: true }
+      });
+      if (user) return res.json(user);
+    } catch (prismaErr) {}
+
+    res.status(404).json({ error: 'User not found' });
+  } catch (err) { res.status(401).json({ error: 'Invalid token: ' + err.message }); }
 });
 
 // PUT /api/auth/preferences — dark mode toggle, avatar
