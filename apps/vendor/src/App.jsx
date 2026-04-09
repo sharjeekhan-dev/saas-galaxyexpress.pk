@@ -16,6 +16,7 @@ import LoginPage from '@shared/LoginPage.jsx';
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function App() {
+  // Galaxy Express v3.1 Stabilization Update
   const { user: vendor, loading: authLoading, logout, isAuthenticated } = useAuth();
   
   const [currentUser, setCurrentUser] = useState(null);
