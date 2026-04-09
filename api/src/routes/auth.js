@@ -82,8 +82,18 @@ router.post('/login', async (req, res) => {
 
     // Log login (Silent failure)
     try {
-      await db.collection('systemLogs').add({ userId, tenantId: user.tenantId, action: 'LOGIN', details: `${user.role} login via bridge`, createdAt: new Date().toISOString() });
-    } catch (e) {}
+      if (db) {
+        await db.collection('systemLogs').add({ 
+          userId, 
+          tenantId: user.tenantId, 
+          action: 'LOGIN', 
+          details: `${user.role} login via bridge`, 
+          createdAt: new Date().toISOString() 
+        });
+      }
+    } catch (e) {
+      console.warn('⚠️ Firestore logging failed:', e.message);
+    }
 
     res.json({
       token,
