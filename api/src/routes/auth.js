@@ -42,7 +42,9 @@ router.post('/login', async (req, res) => {
       user = await req.prisma.user.findUnique({ where });
       if (user) {
         userId = user.id;
-        console.log(`✅ User found in Prisma: ${email || phone}`);
+        console.log(`✅ User found in Prisma: ${email || phone} (ID: ${userId})`);
+      } else {
+        console.log(`🔍 User NOT found in Prisma: ${email || phone}`);
       }
     } catch (prismaErr) {
       console.error('❌ Prisma search failed:', prismaErr.message);
@@ -73,6 +75,7 @@ router.post('/login', async (req, res) => {
     // However, the migration usually preserves the hash.
     if (user.password) {
       const isValid = await bcrypt.compare(password, user.password);
+      console.log(`🔑 Password check for ${email || phone}: ${isValid ? 'PASSED' : 'FAILED'}`);
       if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
     } else {
       // If no password in Firestore/Prisma, we assume they must use Social Login or Firebase SDK directly.

@@ -53,20 +53,15 @@ const corsOptions = {
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
-  optionsSuccessStatus: 200  // Some browsers (IE11) choke on 204
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
-// Explicitly handle preflight for ALL routes (fixes QUIC/ERR_QUIC_PROTOCOL_ERROR)
 app.options('*', cors(corsOptions));
-
 app.use(express.json({ limit: '50mb' }));
 app.use(morgan('dev'));
-
-// Static file serving for uploads
 app.use('/uploads', express.static('uploads'));
 
-// Assign prisma & io to req for easy access in controllers
 app.use((req, res, next) => {
   req.prisma = prisma;
   req.io = io;
@@ -90,8 +85,7 @@ app.use((req, res, next) => {
   next();
 });
 
-
-// ============ Load Routes ============
+// Load Routes
 import authRoutes from './routes/auth.js';
 import tenantRoutes from './routes/tenant.js';
 import posRoutes from './routes/pos.js';
@@ -112,8 +106,6 @@ import contentRoutes from './routes/content.js';
 import apikeysRoutes from './routes/apikeys.js';
 import dailyclosingRoutes from './routes/dailyclosing.js';
 import galleryRoutes from './routes/gallery.js';
-
-// Phase 2 Routes
 import chatRoutes from './routes/chat.js';
 import settingsRoutes from './routes/settings.js';
 import printersRoutes from './routes/printers.js';
@@ -122,27 +114,7 @@ import invoicesRoutes from './routes/invoices.js';
 import backupRoutes from './routes/backup.js';
 import accountsRoutes from './routes/accounts.js';
 
-
-// ============ Register// Health check diagnostic
-app.get('/api/health', async (req, res) => {
-  const status = {
-    server: 'ONLINE',
-    prisma: 'CONNECTED',
-    firebase: admin.apps.length > 0 ? 'INITIALIZED' : 'NOT_INITIALIZED',
-    firebase_mode: process.env.FIREBASE_SERVICE_ACCOUNT ? 'FULL_SERVICE_ACCOUNT' : 'LIMITED_PROJECT_ID',
-    timestamp: new Date().toISOString()
-  };
-  
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-  } catch (e) {
-    status.prisma = 'ERROR: ' + e.message;
-  }
-  
-  res.json(status);
-});
-
-// Routes initialization
+// Route Registration
 app.use('/api/auth', authRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/pos', posRoutes);
@@ -171,13 +143,10 @@ app.use('/api/invoices', invoicesRoutes);
 app.use('/api/backup', backupRoutes);
 app.use('/api/accounts', accountsRoutes);
 
-
-// Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString(), routes: 19 });
+  res.json({ status: 'OK', timestamp: new Date().toISOString(), routes: 27 });
 });
 
-// Auto DB Setup Endpoint
 app.get('/api/setup', async (req, res) => {
   try {
     const { stdout: pushOut } = await execPromise('npx prisma db push');
@@ -187,15 +156,13 @@ app.get('/api/setup', async (req, res) => {
         <h2 style="color: blue;">Database Setup Successful! 🎉</h2>
         <pre>${pushOut}</pre>
         <pre>${seedOut}</pre>
-        <p>Aap wapas aa kar Vercel per Frontend deploy kar saktay hain!</p>
       </div>
     `);
   } catch (error) {
-    res.status(500).send(`Error setting up database: ${error.message} - ${error.stdout} - ${error.stderr}`);
+    res.status(500).send(`Error setting up database: ${error.message}`);
   }
 });
 
-// Global error handling middleware
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err);
   res.status(err.status || 500).json({
@@ -203,30 +170,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
 });
 
-// ============ WebSocket ============
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
-
   socket.on('join_room', ({ tenantId, outletId, userId, chatId }) => {
     if (tenantId) socket.join(`tenant_${tenantId}`);
     if (outletId) socket.join(`outlet_${outletId}`);
-    if (userId) socket.join(`user_${userId}`); // For push notifications
-    if (chatId) socket.join(`chat_${chatId}`); // For direct messaging
+    if (userId) socket.join(`user_${userId}`);
+    if (chatId) socket.join(`chat_${chatId}`);
   });
-
-  socket.on('rider_location_update', (data) => {
-    io.to(`tenant_${data.tenantId}`).emit('rider_location', data);
-  });
-
-  socket.on('typing', ({ chatId, userId }) => {
-    socket.to(`chat_${chatId}`).emit('user_typing', { userId });
-  });
-
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`);
   });
@@ -235,34 +190,45 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 23 API route modules loaded`);
   
-  // Auto-inject Master Admin
+  // Auto-inject Master Admin into Dual Persistence
   (async () => {
     try {
       const email = 'sharjeel@galaxyexpress.pk';
       const password = await bcrypt.hash('sharjeel72930011#', 12);
       
-      await prisma.user.upsert({
-        where: { email },
-        update: {
-          password,
-          role: 'SUPER_ADMIN',
-          status: 'APPROVED',
-          isActive: true
-        },
-        create: {
-          email,
-          password,
-          name: 'Sharjeel - Galaxy Express Super Admin',
-          role: 'SUPER_ADMIN',
-          status: 'APPROVED',
-          isActive: true
-        }
-      });
-      console.log('💎 GALAXY EXPRESS: Master Admin account secured and ready.');
+      // SQL Injection
+      try {
+        await prisma.user.upsert({
+          where: { email },
+          update: { password, role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true },
+          create: {
+            email,
+            password,
+            name: 'Sharjeel - Galaxy Express Super Admin',
+            role: 'SUPER_ADMIN',
+            status: 'APPROVED',
+            isActive: true
+          }
+        });
+        console.log('💎 GALAXY EXPRESS: Master Admin secured in SQL.');
+      } catch (e) { console.warn('⚠️ SQL Injection skipped.'); }
+
+      // Firestore Injection
+      const { db: firestore } = await import('./firebase-admin.js');
+      if (firestore) {
+         await firestore.collection('users').doc('master-admin').set({
+           email,
+           password,
+           name: 'Sharjeel - Galaxy Express Master',
+           role: 'SUPER_ADMIN',
+           status: 'APPROVED',
+           isActive: true
+         }, { merge: true });
+         console.log('🔥 GALAXY EXPRESS: Master Admin secured in Firestore.');
+      }
     } catch (e) {
-      console.warn('⚠️ Auto-injection warning:', e.message);
+      console.warn('⚠️ Master Injection error:', e.message);
     }
   })();
 });
