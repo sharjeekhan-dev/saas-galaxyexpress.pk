@@ -123,7 +123,26 @@ import backupRoutes from './routes/backup.js';
 import accountsRoutes from './routes/accounts.js';
 
 
-// ============ Register Routes ============
+// ============ Register// Health check diagnostic
+app.get('/api/health', async (req, res) => {
+  const status = {
+    server: 'ONLINE',
+    prisma: 'CONNECTED',
+    firebase: admin.apps.length > 0 ? 'INITIALIZED' : 'NOT_INITIALIZED',
+    firebase_mode: process.env.FIREBASE_SERVICE_ACCOUNT ? 'FULL_SERVICE_ACCOUNT' : 'LIMITED_PROJECT_ID',
+    timestamp: new Date().toISOString()
+  };
+  
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (e) {
+    status.prisma = 'ERROR: ' + e.message;
+  }
+  
+  res.json(status);
+});
+
+// Routes initialization
 app.use('/api/auth', authRoutes);
 app.use('/api/tenant', tenantRoutes);
 app.use('/api/pos', posRoutes);
