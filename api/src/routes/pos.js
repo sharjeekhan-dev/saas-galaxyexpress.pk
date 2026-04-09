@@ -155,18 +155,20 @@ router.post('/orders', requireAuth, requireTenant, async (req, res) => {
 
     // 4. Sync to Firestore for real-time Dashboard access
     try {
-      await db.collection('orders').doc(order.id).set({
-        ...order,
-        createdAt: order.createdAt.toISOString(),
-        updatedAt: order.updatedAt.toISOString(),
-        items: order.items.map(i => ({
-          ...i,
-          product: { name: i.product.name, category: i.product.category }
-        }))
-      });
-      console.log('✅ Firestore Sync Success:', order.id);
+      if (db) {
+        await db.collection('orders').doc(order.id).set({
+          ...order,
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+          items: order.items.map(i => ({
+            ...i,
+            product: { name: i.product.name, category: i.product.category }
+          }))
+        });
+        console.log('✅ Firestore Sync Success:', order.id);
+      }
     } catch (fsErr) {
-      console.error('❌ Firestore Sync Failed:', fsErr.message);
+      console.warn('⚠️ Firestore Sync Failed:', fsErr.message);
     }
 
     req.io.to(`outlet_${data.outletId}`).emit('order_created', order);
@@ -217,11 +219,15 @@ router.put('/orders/:id/status', requireAuth, requireTenant, async (req, res) =>
 
     // Update Firestore
     try {
-      await db.collection('orders').doc(order.id).update({ 
-        status: order.status,
-        updatedAt: order.updatedAt.toISOString()
-      });
-    } catch (e) {}
+      if (db) {
+        await db.collection('orders').doc(order.id).update({ 
+          status: order.status,
+          updatedAt: order.updatedAt.toISOString()
+        });
+      }
+    } catch (e) {
+      console.warn('⚠️ Firestore Update Failed:', e.message);
+    }
 
     req.io.to(`outlet_${order.outletId}`).emit('order_status_changed', order);
     res.json(order);
