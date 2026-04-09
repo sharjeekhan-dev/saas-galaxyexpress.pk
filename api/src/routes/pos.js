@@ -1,3 +1,4 @@
+import express from 'express';
 import { requireAuth, requireTenant } from '../middlewares/auth.js';
 import { z } from 'zod';
 import admin from 'firebase-admin';
