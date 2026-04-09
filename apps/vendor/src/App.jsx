@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Store, Package, ShoppingCart, BarChart3, Settings, LogOut,
   Plus, Edit, Trash2, CheckCircle, Clock, Bell, DollarSign, Target, Menu, X, Star, MessageSquare, Send, PhoneCall, Info, Paperclip,
-  Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw, ClipboardCheck, Image
+  Users2, UserCheck, Calendar, Printer, Moon, Sun, Loader2, Workflow, BookOpen, Receipt, Building, Layers, Search, RefreshCw as LucideRefreshCw, ClipboardCheck, Image as LucideImage
 } from 'lucide-react';
 import MasterConfiguration from './components/MasterConfiguration.jsx';
 import InventoryERP from './components/InventoryERP.jsx';
@@ -64,7 +64,7 @@ export default function App() {
       <LoginPage 
         title="Galaxy Express Vendor" 
         subtitle="Manage your business in real-time" 
-        icon="🚀" 
+        icon="ðŸš€" 
         allowedRoles={['VENDOR_ADMIN', 'SUPER_ADMIN', 'MANAGER']}
         onSuccess={(data) => {
           setVendor(data.user);
@@ -122,7 +122,7 @@ export default function App() {
       html = `<!DOCTYPE html><html><head><title>Receipt</title>
       <style>body{font-family:'Courier New',monospace; font-size:12px; margin:0; padding:10px; width:80mm;} .center{text-align:center;} .divider{border-top:1px dashed #000; margin:8px 0;} table{width:100%;font-size:11px;} .right{text-align:right;} th{text-align:left;}</style>
       </head><body>
-      <div class="center"><h2>★ ${vendor?.name || 'GALAXY EXPRESS'} ★</h2>
+      <div class="center"><h2>â˜… ${vendor?.name || 'GALAXY EXPRESS'} â˜…</h2>
       ${isSalesReturn ? '<h3 style="margin:0;color:red;">*** SALES RETURN ***</h3>' : ''}
       <div>Receipt #: ${invId}</div><div>Date: ${date}</div><div>Type: ${posType} ${getMetaHeader()}</div><div>Customer: ${posCustomer}</div></div>
       <div class="divider"></div>
@@ -456,7 +456,7 @@ export default function App() {
 
   if (authLoading) return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#020817', color: '#fff' }}>
-        <RefreshCw size={48} color="#39FF14" className="spin" />
+        <LucideRefreshCw size={48} color="#39FF14" className="spin" />
         <p style={{ marginTop: 20, fontWeight: 700, letterSpacing: 1 }}>SYNCHRONIZING SECURE SESSION...</p>
         <style>{`.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
     </div>
@@ -466,7 +466,7 @@ export default function App() {
     return (
       <LoginPage 
         title="Vendor ERP Cloud" 
-        subtitle="Secure Node Access — erp.galaxyexpress.pk" 
+        subtitle="Secure Node Access â€” erp.galaxyexpress.pk" 
         icon={<Store size={48} color="#39FF14" />} 
         allowedRoles={['VENDOR_ADMIN', 'SUPER_ADMIN', 'MANAGER', 'CASHIER', 'VENDOR']}
         onSuccess={() => {}} // AuthContext will handle state update
@@ -760,7 +760,7 @@ export default function App() {
                   <div style={{ background: 'rgba(141,224,44,0.1)', color: '#65a30d', padding: '6px 12px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#8de02c' }}></div> System Monitoring Active
                   </div>
-                  <button onClick={fetchOrders} className="btn-icon"><RefreshCw size={16} className={isFetchingOrders ? 'spin' : ''} /></button>
+                  <button onClick={fetchOrders} className="btn-icon"><LucideRefreshCw size={16} className={isFetchingOrders ? 'spin' : ''} /></button>
                 </div>
               </div>
 
@@ -887,7 +887,7 @@ export default function App() {
             <DailyClosingERP theme={theme} showToast={showToast} API={API} vendor={vendor} />
           )}
 
-          {/* REPORTS VIEW — FULL ERP CLONE */}
+          {/* REPORTS VIEW â€” FULL ERP CLONE */}
 
           {activeTab === 'reports' && (
             <div>
@@ -1053,7 +1053,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* STOCK REPORTS — Baranh ERP Clone */}
+              {/* STOCK REPORTS â€” Baranh ERP Clone */}
               {reportTab === 'stocks' && (
                 <div style={{ animation: 'fadeIn 0.3s', display: 'flex', gap: 24 }}>
                   <div style={{ width: 420, flexShrink: 0, background: theme.card, borderRadius: 16, border: `1px solid ${theme.border}`, padding: 30 }}>
@@ -1379,7 +1379,7 @@ export default function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: '1.1rem', color: theme.text }}>{r.customer}</div>
-                        <div style={{ color: theme.muted, fontSize: '0.85rem', marginTop: 2 }}>Order: {r.orderId} • {r.date}</div>
+                        <div style={{ color: theme.muted, fontSize: '0.85rem', marginTop: 2 }}>Order: {r.orderId} â€¢ {r.date}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 2 }}>
                         {[...Array(5)].map((_, i) => (
@@ -1508,7 +1508,7 @@ export default function App() {
                           <div>
                             <div style={{ fontWeight: 800, color: theme.text, fontSize: '1.05rem' }}>{currChat.participant}</div>
                             <div style={{ fontSize: '0.75rem', color: '#39FF14', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#39FF14', boxShadow: '0 0 10px #39FF14' }}></div> {currChat.type} • {currChat.order}
+                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#39FF14', boxShadow: '0 0 10px #39FF14' }}></div> {currChat.type} â€¢ {currChat.order}
                             </div>
                           </div>
                         </div>
@@ -1570,7 +1570,7 @@ export default function App() {
                     onClick={() => setIsSalesReturn(!isSalesReturn)}
                     disabled={!hasPerm('sales_return')}
                     style={{ padding: '10px 20px', borderRadius: 20, border: 'none', fontWeight: 800, cursor: hasPerm('sales_return') ? 'pointer' : 'not-allowed', background: isSalesReturn ? '#ef4444' : 'rgba(239,68,68,0.1)', color: isSalesReturn ? '#fff' : '#ef4444', transition: '0.2s', display: 'flex', alignItems: 'center', gap: 8, opacity: hasPerm('sales_return') ? 1 : 0.4, whiteSpace: 'nowrap' }}>
-                    <RefreshCw size={16} /> {isSalesReturn ? 'Sales Return ACTIVE' : 'Sales Return'}
+                    <LucideRefreshCw size={16} /> {isSalesReturn ? 'Sales Return ACTIVE' : 'Sales Return'}
                   </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16, overflowY: 'auto', paddingRight: 10 }}>
@@ -1592,7 +1592,7 @@ export default function App() {
                     >
                       {p.stock === 'Low Stock' && <div style={{ position: 'absolute', top: 8, right: 8, background: '#ef4444', color: '#fff', fontSize: '0.55rem', padding: '2px 6px', borderRadius: 6, fontWeight: 900, zIndex: 2 }}>LOW STOCK</div>}
                       <div style={{ width: '100%', height: 80, background: theme.bg, borderRadius: 10, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem' }}>
-                        {p.category === 'Pizza' ? '🍕' : p.category === 'Burgers' ? '🍔' : p.category === 'Drinks' ? '🥤' : '🍟'}
+                        {p.category === 'Pizza' ? 'ðŸ•' : p.category === 'Burgers' ? 'ðŸ”' : p.category === 'Drinks' ? 'ðŸ¥¤' : 'ðŸŸ'}
                       </div>
                       <div style={{ fontWeight: 800, color: theme.text, marginBottom: 4, fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1642,12 +1642,12 @@ export default function App() {
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', flex: 1, alignItems: 'center', gap: 12 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', WebkitUserSelect: 'none' }}>
-                          <button onClick={() => setPosCart(posCart.map(x => x.id === c.id ? { ...x, qty: x.qty + 1 } : x))} style={{ background: theme.bg, border: 'none', color: theme.text, cursor: 'pointer', padding: 4, borderRadius: 4 }}>▲</button>
+                          <button onClick={() => setPosCart(posCart.map(x => x.id === c.id ? { ...x, qty: x.qty + 1 } : x))} style={{ background: theme.bg, border: 'none', color: theme.text, cursor: 'pointer', padding: 4, borderRadius: 4 }}>â–²</button>
                           <div style={{ textAlign: 'center', fontWeight: 800 }}>{c.qty}</div>
                           <button onClick={() => {
                             if (c.qty > 1) setPosCart(posCart.map(x => x.id === c.id ? { ...x, qty: x.qty - 1 } : x));
                             else setPosCart(posCart.filter(x => x.id !== c.id));
-                          }} style={{ background: theme.bg, border: 'none', color: theme.text, cursor: 'pointer', padding: 4, borderRadius: 4 }}>▼</button>
+                          }} style={{ background: theme.bg, border: 'none', color: theme.text, cursor: 'pointer', padding: 4, borderRadius: 4 }}>â–¼</button>
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: theme.text }}>{c.name}</div>
@@ -1660,7 +1660,7 @@ export default function App() {
                 </div>
 
                 <div style={{ padding: '0 20px 20px', borderTop: `1px dashed ${theme.border}`, background: 'rgba(0,0,0,0.1)' }}>
-                  {/* DISCOUNT / SERVICE / TAX / SPLIT — Admin Only Controls */}
+                  {/* DISCOUNT / SERVICE / TAX / SPLIT â€” Admin Only Controls */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '14px 0', borderBottom: `1px dashed ${theme.border}`, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ color: theme.muted, fontSize: '0.8rem', width: 55 }}>Discount</span>
@@ -1686,7 +1686,7 @@ export default function App() {
                       <span style={{ color: theme.muted, fontSize: '0.75rem' }}>pax</span>
                     </div>
                   </div>
-                  {!hasPerm('ALL') && <div style={{ fontSize: '0.7rem', color: '#f97316', marginBottom: 8, fontWeight: 600 }}>⚠ Discount, Tax & Service Charge locked — Admin only</div>}
+                  {!hasPerm('ALL') && <div style={{ fontSize: '0.7rem', color: '#f97316', marginBottom: 8, fontWeight: 600 }}>âš  Discount, Tax & Service Charge locked â€” Admin only</div>}
 
                   {(() => {
                     const subtotal = posCart.reduce((s, c) => s + (c.price * c.qty), 0);
@@ -1761,9 +1761,9 @@ export default function App() {
                     textAlign: 'center', cursor: 'pointer', transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
                   }} onMouseOver={e=>{e.currentTarget.style.transform='translateY(-8px)'; e.currentTarget.style.borderColor='#39FF14';}} onMouseOut={e=>{e.currentTarget.style.transform='none'; e.currentTarget.style.borderColor=theme.border;}}>
-                    <div style={{ fontSize: '4.5rem', marginBottom: 16 }}>📂</div>
+                    <div style={{ fontSize: '4.5rem', marginBottom: 16 }}>ðŸ“‚</div>
                     <div style={{ fontWeight: 900, fontSize: '1.2rem', color: theme.text }}>{folder}</div>
-                    <div style={{ fontSize: '0.8rem', color: theme.muted, marginTop: 6, fontWeight: 600 }}>124 Items · 850 MB</div>
+                    <div style={{ fontSize: '0.8rem', color: theme.muted, marginTop: 6, fontWeight: 600 }}>124 Items Â· 850 MB</div>
                   </div>
                 ))}
               </div>
