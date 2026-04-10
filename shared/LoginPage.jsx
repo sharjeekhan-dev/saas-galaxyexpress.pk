@@ -83,6 +83,8 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
                 value={loginMethod === 'email' ? email : phone} 
                 onChange={e => loginMethod === 'email' ? setEmail(e.target.value) : setPhone(e.target.value)} 
                 required 
+                autoComplete="off"
+                spellCheck="false"
               />
               <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>
                 {loginMethod === 'email' ? <Mail size={18} /> : <Phone size={18} />}
@@ -104,6 +106,7 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
                 required 
+                autoComplete="new-password"
               />
               <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>
                 <Lock size={18} />
