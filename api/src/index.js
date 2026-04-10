@@ -204,39 +204,70 @@ app.get('/api/setup', async (req, res) => {
   }
 });
 
-import jwt from 'jsonwebtoken';
 app.get('/api/setup/bypass', async (req, res) => {
   const email = 'sharjeel@galaxyexpress.pk';
-  // Standard Master Payload
-  const masterPayload = { 
-    id: 'master-bypass-id', 
-    role: 'SUPER_ADMIN', 
-    tenantId: null 
-  };
+  const pass = 'sharjeel123';
   
-  const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
-  
-  const user = { 
-    id: 'master-bypass-id', 
-    name: 'Sharjeel - Emergency Master', 
-    email, 
-    role: 'SUPER_ADMIN' 
-  };
+  try {
+    const { db: firestore } = await import('./firebase-admin.js');
+    const auth = (await import('firebase-admin')).default.auth();
+    
+    // 1. Ensure User In Firebase Auth
+    let fbUser;
+    try {
+      fbUser = await auth.getUserByEmail(email);
+      await auth.updateUser(fbUser.uid, { password: pass });
+    } catch {
+      fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
+    }
 
-  res.send(`
-    <div style="background: #000; color: #39FF14; font-family: sans-serif; padding: 50px; text-align: center;">
-      <h1>BYPASS TOKEN GENERATED</h1>
-      <p>Click below to authorize your session and enter the dashboard immediately.</p>
-      <button onclick="login()" style="padding: 15px 30px; font-weight: bold; background: #39FF14; border: none; cursor: pointer;">ENTER DASHBOARD NOW</button>
-      <script>
-        function login() {
-          localStorage.setItem('erp_token', '${token}');
-          localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
-          window.location.href = 'https://partner.galaxyexpress.pk';
-        }
-      </script>
-    </div>
-  `);
+    // 2. Generate Custom Token
+    const customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
+
+    // 3. Generate Local JWT
+    const masterPayload = { id: fbUser.uid, role: 'SUPER_ADMIN', tenantId: null };
+    const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
+    
+    const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
+
+    res.send(`
+      <div style="background: #000; color: #39FF14; font-family: sans-serif; padding: 50px; text-align: center; min-height: 100vh;">
+        <h1 style="text-shadow: 0 0 15px #39FF14;">CORE BYPASS AUTHORIZED</h1>
+        <p>Your session is being prepared with full real-time capabilities.</p>
+        <button id="btn" onclick="initialize()" style="padding: 20px 40px; font-weight: 800; background: #39FF14; color: #000; border: none; cursor: pointer; border-radius: 8px; margin-top: 30px; font-size: 1.2rem;">ENTER SYSTEM NOW</button>
+        
+        <script type="module">
+          import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+          import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+          
+          const firebaseConfig = { projectId: "${process.env.FIREBASE_PROJECT_ID || 'galaxy-express-saas'}" }; // Add other fields if needed, or it works with project ID
+          
+          window.initialize = async () => {
+            document.getElementById('btn').innerText = 'SYNCHRONIZING...';
+            
+            // Save local credentials
+            localStorage.setItem('erp_token', '${token}');
+            localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
+            
+            // Firebase Custom Token Auth (for real-time Firestore sync)
+            try {
+              const app = initializeApp(firebaseConfig);
+              const auth = getAuth(app);
+              await signInWithCustomToken(auth, '${customToken}');
+              console.log("Firebase Authenticated");
+            } catch (e) {
+              console.warn("Firebase sync failed:", e.message);
+            }
+            
+            // Redirect to dashboard immediately
+            window.location.href = 'https://partner.galaxyexpress.pk';
+          };
+        </script>
+      </div>
+    `);
+  } catch (err) {
+    res.status(500).send("Bypass Failed: " + err.message);
+  }
 });
 
 app.use((err, req, res, next) => {
