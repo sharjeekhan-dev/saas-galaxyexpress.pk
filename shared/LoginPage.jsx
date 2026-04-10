@@ -11,7 +11,7 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, setUserManually } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -140,14 +140,38 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
           >
             SWITCH TO {loginMethod === 'email' ? 'PHONE' : 'EMAIL'} LOGIN
           </button>
+
+          {/* DEVELOPMENT BYPASS */}
+          <div style={{ marginTop: 24, padding: '16px', background: 'rgba(57, 255, 20, 0.03)', borderRadius: 16, border: '1px dashed rgba(57, 255, 20, 0.3)' }}>
+            <p style={{ margin: '0 0 12px', fontSize: '0.7rem', color: 'rgba(57, 255, 20, 0.7)', textAlign: 'center', fontWeight: 800 }}>DEVELOPER OVERRIDE</p>
+            <button 
+              type="button"
+              onClick={() => {
+                setUserManually({
+                  id: 'dev-master', 
+                  name: 'Galaxy Partner (Bypass)', 
+                  role: 'SUPER_ADMIN', 
+                  tenantId: 'global',
+                  email: 'admin@galaxy.pk'
+                }, 'dev-token-bypass');
+              }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 12, background: 'rgba(57, 255, 20, 0.1)',
+                color: '#39FF14', fontWeight: 800, border: '1px solid #39FF14', cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              🔓 SKIP LOGIN (DEMO MODE)
+            </button>
+          </div>
         </form>
 
         <div className="login-footer" style={{ textAlign: 'center', marginTop: 32, color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
             <ShieldCheck size={14} color="#39FF14" />
-            <span style={{ color: '#39FF14', fontWeight: 800 }}>SECURE CONNECTION ACTIVE</span>
+            <span style={{ color: '#39FF14', fontWeight: 800 }}>HYBRID FIREBASE/SQL SYSTEM ACTIVE</span>
           </div>
-          Restricted Access · Galaxy Express v3.2 Production
+          Restricted Access · Galaxy Express v3.5
         </div>
       </div>
     </div>

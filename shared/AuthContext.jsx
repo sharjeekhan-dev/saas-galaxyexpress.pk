@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth } from './firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -16,62 +18,70 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Initial Check: Try to recover local session
-    const initializeAuth = async () => {
-      const localUserJson = localStorage.getItem('erp_user');
-      const token = localStorage.getItem('erp_token');
-
-      if (localUserJson && token) {
+    // 1. Listen for Firebase Auth Changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
         try {
-          const localUser = JSON.parse(localUserJson);
-          setUser(localUser);
-          
-          // Verify token/session with backend
+          // Get ID Token for backend verification
+          const token = await firebaseUser.getIdToken();
+          localStorage.setItem('erp_token', token);
+
+          // Fetch Full Profile from SQL (Sync happens on backend req.user)
           const response = await fetch(`${API_URL}/api/auth/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           
           if (response.ok) {
-            const freshUser = await response.json();
-            setUser(freshUser);
-            localStorage.setItem('erp_user', JSON.stringify(freshUser));
+            const sqlUser = await response.json();
+            setUser(sqlUser);
+            localStorage.setItem('erp_user', JSON.stringify(sqlUser));
           } else {
-            // Token expired or user deleted
-            logout();
+             // Fallback: If SQL fetch fails, at least set the Firebase basic info
+             setUser({ id: firebaseUser.uid, email: firebaseUser.email, role: 'VENDOR' });
           }
         } catch (e) {
-          console.warn("⚠️ Auth initialization failed:", e);
-          logout();
+          console.warn("⚠️ Auth sync failed:", e);
+        }
+      } else {
+        // Check for Bypass/Local Session
+        const localUserJson = localStorage.getItem('erp_user');
+        const token = localStorage.getItem('erp_token');
+        if (localUserJson && token && token.startsWith('dev-token')) {
+          setUser(JSON.parse(localUserJson));
+        } else {
+          setUser(null);
         }
       }
       setLoading(false);
-    };
+    });
 
-    initializeAuth();
+    return () => unsubscribe();
   }, []);
 
   const login = async (credentials) => {
     setLoading(true);
     setError(null);
-    const { email, phone, password } = credentials;
+    const { email, password } = credentials;
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email?.trim(), phone, password })
-      });
+      // 1. Authenticate with Firebase first
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const token = await userCredential.user.getIdToken();
+      localStorage.setItem('erp_token', token);
 
+      // 2. Fetch full profile to verify SQL sync
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
       if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        localStorage.setItem('erp_token', data.token);
-        localStorage.setItem('erp_user', JSON.stringify(data.user));
-        return data.user;
-      } else {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Authentication Failed');
+        const sqlUser = await response.json();
+        setUser(sqlUser);
+        localStorage.setItem('erp_user', JSON.stringify(sqlUser));
+        return sqlUser;
       }
+      return userCredential.user;
     } catch (err) {
       setError(err.message);
       throw err;
@@ -80,11 +90,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const setUserManually = (userData, token) => {
+    setUser(userData);
+    localStorage.setItem('erp_user', JSON.stringify(userData));
+    localStorage.setItem('erp_token', token);
+  };
+
+  const logout = async () => {
     localStorage.removeItem('erp_token');
     localStorage.removeItem('erp_user');
+    await signOut(auth);
     setUser(null);
-    // Optional: Redirect to login page
     window.location.href = '/login';
   };
 
@@ -94,10 +110,10 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     logout,
+    setUserManually,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'SUPER_ADMIN',
-    isTenantAdmin: user?.role === 'TENANT_ADMIN',
-    isVendor: user?.role === 'VENDOR',
+    isVendor: user?.role === 'VENDOR' || user?.role === 'VENDOR_ADMIN',
     isStaff: ['MANAGER', 'CASHIER', 'WAITER', 'KITCHEN'].includes(user?.role)
   };
 
