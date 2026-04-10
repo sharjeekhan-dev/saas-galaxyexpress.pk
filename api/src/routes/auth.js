@@ -38,47 +38,51 @@ router.post('/login', async (req, res) => {
     let userId = null;
 
     try {
-      const where = email ? { email: email.toLowerCase() } : { phone };
+      const where = email ? { email: email.toLowerCase().trim() } : { phone };
+      console.log(`🔍 Attempting login for: ${email || phone}`);
       user = await req.prisma.user.findUnique({ where });
+      
       if (user) {
         userId = user.id;
-        console.log(`✅ User found in Prisma: ${email || phone} (ID: ${userId})`);
+        console.log(`✅ SQL FOUND: ID=${user.id}, ROLE=${user.role}, STATUS=${user.status}`);
       } else {
-        console.log(`🔍 User NOT found in Prisma: ${email || phone}`);
+        console.log(`❌ SQL MISS: Not found in Prisma`);
       }
     } catch (prismaErr) {
-      console.error('❌ Prisma search failed:', prismaErr.message);
+      console.error('❌ SQL ERROR:', prismaErr.message);
     }
 
     // 2. Fallback to Firestore (Secondary/Migration mode)
     if (!user && db && email) {
       try {
-        const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
+        const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase().trim()).limit(1).get();
         if (!userSnapshot.empty) {
           const userDoc = userSnapshot.docs[0];
           user = userDoc.data();
           userId = userDoc.id;
-          console.log(`📡 User found in Firestore fallback: ${email}`);
+          console.log(`📡 FIRESTORE FOUND: ${email}`);
         }
       } catch (firestoreErr) {
-        console.warn('⚠️ Firestore fallback failed:', firestoreErr.message);
+        console.warn('⚠️ FIRESTORE ERROR:', firestoreErr.message);
       }
     }
 
-    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
-    if (user.status === 'PENDING') return res.status(403).json({ error: 'Your account is pending approval from the Super Admin.' });
+    if (!user) {
+      console.log(`🚫 AUTH FAILED: User account not found in any source.`);
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    if (user.status === 'PENDING') return res.status(403).json({ error: 'Your account is pending approval.' });
     if (user.status === 'REJECTED') return res.status(403).json({ error: 'Your account request was rejected.' });
     if (user.isActive === false) return res.status(403).json({ error: 'Account is deactivated' });
 
-    // Validate password (both sources assume bcrypt or similar)
-    // NOTE: For purely Firebase users, this check might fail if they don't have a 'password' field in Firestore.
-    // However, the migration usually preserves the hash.
+    // Validate password
     if (user.password) {
       const isValid = await bcrypt.compare(password, user.password);
-      console.log(`🔑 Password check for ${email || phone}: ${isValid ? 'PASSED' : 'FAILED'}`);
+      console.log(`🔑 PASSWORD CHECK: ${isValid ? 'SUCCESS' : 'FAILURE'}`);
       if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
     } else {
-      // If no password in Firestore/Prisma, we assume they must use Social Login or Firebase SDK directly.
+      console.log(`🚫 AUTH FAILED: User found but has NO password field (Internal/Social account).`);
       return res.status(401).json({ error: 'This account requires Social Login' });
     }
 

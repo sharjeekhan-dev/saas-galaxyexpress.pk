@@ -25,7 +25,7 @@ async function main() {
   console.log('✅ Tenant:', tenant.name);
 
   // 2. Create users for every role
-  const password = await bcrypt.hash('sharjeel72930011#', 12);
+  const password = await bcrypt.hash('sharjeel123', 12);
 
   const adminEmail = 'sharjeel@galaxyexpress.pk';
   const superAdmin = await prisma.user.upsert({

@@ -157,7 +157,7 @@ app.get('/api/setup', async (req, res) => {
     log.seed = 'Complete';
 
     const email = 'sharjeel@galaxyexpress.pk';
-    const hashedPassword = await bcrypt.hash('sharjeel72930011#', 12);
+    const hashedPassword = await bcrypt.hash('sharjeel123', 12);
     
     await prisma.user.upsert({
       where: { email },
@@ -191,6 +191,7 @@ app.get('/api/setup', async (req, res) => {
           <h2 style="margin: 0;">SYSTEM LIVE</h2>
           <p>Login at: <strong>partner.galaxyexpress.pk</strong></p>
           <p>User: <strong>${email}</strong></p>
+          <p>Pass: <strong>sharjeel123</strong></p>
         </div>
         <p style="margin-top: 40px; opacity: 0.5;">Status: MISSION_READY | Timestamp: ${new Date().toISOString()}</p>
       </div>
@@ -232,7 +233,7 @@ server.listen(PORT, '0.0.0.0', () => {
   (async () => {
     try {
       const email = 'sharjeel@galaxyexpress.pk';
-      const password = await bcrypt.hash('sharjeel72930011#', 12);
+      const password = await bcrypt.hash('sharjeel123', 12);
       
       // SQL Injection
       try {
