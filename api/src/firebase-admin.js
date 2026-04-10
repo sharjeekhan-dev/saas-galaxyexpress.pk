@@ -21,6 +21,11 @@ if (!admin.apps.length) {
           ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
           : process.env.FIREBASE_SERVICE_ACCOUNT;
         
+        // Critical Fix: Sanitize private key for cloud env vars (Railway/Vercel)
+        if (serviceAccount && serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+        
         firebaseConfig = {
           credential: admin.credential.cert(serviceAccount),
           projectId: serviceAccount.project_id

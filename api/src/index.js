@@ -222,14 +222,26 @@ app.get('/api/setup/bypass', async (req, res) => {
       fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
     }
 
-    // 2. Sync Firestore Record (Crucial for rules)
-    await firestore.collection('users').doc(fbUser.uid).set({
-      email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
-      status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
-    }, { merge: true });
+    // 2. Sync Firestore Record (Only if credentials exist)
+    let syncStatus = "Identity Synchronized ✓";
+    let customToken = null;
+    
+    if (admin.apps[0]?.options?.credential) {
+      try {
+        await firestore.collection('users').doc(fbUser.uid).set({
+          email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
+          status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
+        }, { merge: true });
+        customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
+      } catch (e) {
+        console.warn("Firestore sync skipped:", e.message);
+        syncStatus = "Recovery Mode Active (Local Auth Only)";
+      }
+    } else {
+      syncStatus = "Recovery Mode Active (Firebase Creds Missing)";
+    }
 
-    // 3. Generate Custom Token & JWT
-    const customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
+    // 3. Generate Local JWT
     const masterPayload = { id: fbUser.uid, role: 'SUPER_ADMIN', tenantId: null };
     const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
     const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
@@ -239,8 +251,9 @@ app.get('/api/setup/bypass', async (req, res) => {
         <h1 style="text-shadow: 0 0 20px #39FF14; margin-bottom: 30px;">⚡ GALAXY EXPRESS ROOT INITIALIZATION</h1>
         <div id="log" style="background: rgba(57,255,20,0.05); border: 1px solid #39FF14; padding: 20px; text-align: left; max-width: 650px; margin: 0 auto; min-height: 200px; border-radius: 8px; font-size: 0.9rem; line-height: 1.6;">
           <p style="color: #fff; margin: 0;">[SYSTEM] Identity Protocol Ready...</p>
+          <div style="color: #39FF14; margin-top: 10px;">[STATUS] ${syncStatus}</div>
         </div>
-        <button id="btn" onclick="startRootProtocol()" style="margin-top: 30px; padding: 20px 50px; background: #39FF14; color: #000; border: none; font-weight: 900; cursor: pointer; border-radius: 4px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px;">Initialize Master Session</button>
+        <button id="btn" onclick="startRootProtocol()" style="margin-top: 30px; padding: 20px 50px; background: #39FF14; color: #000; border: none; font-weight: 900; cursor: pointer; border-radius: 4px; font-size: 1.2rem; text-transform: uppercase;">Initialize Master Session</button>
         
         <script type="module">
           import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -267,13 +280,18 @@ app.get('/api/setup/bypass', async (req, res) => {
             btn.innerText = 'INITIALIZING...';
             
             try {
-              addLog("Contacting Firebase Authorization Cluster...");
-              const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
-              const auth = getAuth(app);
+              const customToken = ${customToken ? `'${customToken}'` : 'null'};
               
-              addLog("Validating Master Credentials...");
-              await signInWithCustomToken(auth, '${customToken}');
-              addLog("Firebase Auth Handshake: SUCCESS", "#fff");
+              if (customToken) {
+                addLog("Contacting Firebase Authorization Cluster...");
+                const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
+                const auth = getAuth(app);
+                addLog("Validating Master Credentials...");
+                await signInWithCustomToken(auth, customToken);
+                addLog("Firebase Auth Handshake: SUCCESS", "#fff");
+              } else {
+                addLog("NOTICE: Proceeding with Local Identity Node (Real-time restricted)", "#0ea5e9");
+              }
               
               addLog("Injecting Local Security Tokens...");
               localStorage.setItem('erp_token', '${token}');
