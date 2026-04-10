@@ -152,7 +152,7 @@ export default function App() {
     opening_times: <OpeningTimes />,
     gallery: <GalleryPage user={user} />,
     audit: <AuditReportPage />,
-    settings: <SettingsPage />,
+    settings: <Settings />,
   };
 
   const navItems = NAV.filter(n => !n.role || (n.role === 'SUPER_ADMIN' && isAdmin));

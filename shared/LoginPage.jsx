@@ -75,7 +75,7 @@ export default function LoginPage({ title, subtitle, icon, onSuccess, allowedRol
               <input 
                 className="form-input" 
                 type={loginMethod === 'email' ? 'email' : 'text'} 
-                placeholder={loginMethod === 'email' ? "admin@galaxyexpress.pk" : "+92 ..."}
+                placeholder={loginMethod === 'email' ? "Enter your email" : "Enter phone number"}
                 style={{
                   width: '100%', padding: '14px 16px 14px 44px', borderRadius: 12, background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: '0.95rem', outline: 'none'
