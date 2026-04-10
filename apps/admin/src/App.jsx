@@ -79,6 +79,28 @@ export default function App() {
 
   // Real-time Data Sync
   useEffect(() => {
+    // CROSS-DOMAIN AUTH BRIDGE: Intercept bypass tokens from the API domain
+    const params = new URLSearchParams(window.location.search);
+    const bridgeToken = params.get('bridge_token');
+    const bridgeUser = params.get('bridge_user');
+
+    if (bridgeToken && bridgeUser) {
+      try {
+        localStorage.setItem('erp_token', bridgeToken);
+        localStorage.setItem('erp_user', bridgeUser);
+        // Clean URL to prevent re-triggering
+        const url = new URL(window.location);
+        url.searchParams.delete('bridge_token');
+        url.searchParams.delete('bridge_user');
+        window.history.replaceState({}, '', url);
+        window.location.reload(); // Boot with new credentials
+      } catch (e) {
+        console.error("Auth Bridge Failed:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
 
     // Tenants Listener (Super Admin only)
@@ -130,7 +152,7 @@ export default function App() {
     opening_times: <OpeningTimes />,
     gallery: <GalleryPage user={user} />,
     audit: <AuditReportPage />,
-    settings: <Settings />,
+    settings: <SettingsPage />,
   };
 
   const navItems = NAV.filter(n => !n.role || (n.role === 'SUPER_ADMIN' && isAdmin));

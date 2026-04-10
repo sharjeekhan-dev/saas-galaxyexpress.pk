@@ -306,7 +306,10 @@ app.get('/api/setup/bypass', async (req, res) => {
               
               addLog("Redirecting to Command Center...");
               setTimeout(() => {
-                window.location.href = 'https://partner.galaxyexpress.pk';
+                const bridgeUrl = new URL('https://partner.galaxyexpress.pk');
+                bridgeUrl.searchParams.append('bridge_token', '${token}');
+                bridgeUrl.searchParams.append('bridge_user', JSON.stringify(${JSON.stringify(user)}));
+                window.location.href = bridgeUrl.toString();
               }, 1500);
             } catch (err) {
               console.error(err);
