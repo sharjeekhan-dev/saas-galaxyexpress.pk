@@ -6,7 +6,7 @@ import {
   Tag, Image, BookOpen, Key, UserCog, MapPin, Receipt, Percent, Wallet,
   Truck, Shield, HelpCircle, BarChart3, MessageCircle, Menu, X,
   ShoppingBag, Factory, Briefcase, Users2, ClipboardList, Search, Eye,
-  Clock, CheckCircle, Star
+  Clock, CheckCircle, Star, ShieldCheck
 } from 'lucide-react';
 
 import DashboardPage from './components/DashboardPage.jsx';
@@ -21,6 +21,8 @@ import MenuManagement from './components/MenuManagement.jsx';
 import OpeningTimes from './components/OpeningTimes.jsx';
 import GalleryPage from './components/GalleryPage.jsx';
 import ProfileModal from './components/ProfileModal.jsx';
+import AuditReportPage from './components/AuditReportPage.jsx';
+import Settings from './components/SettingsPage.jsx';
 import LoginPage from '@shared/LoginPage.jsx';
 import { useAuth } from '@shared/AuthContext.jsx';
 import { db } from '@shared/firebase.js';
@@ -50,7 +52,8 @@ const NAV = [
   { id: 'users', label: 'Users & RBAC', icon: Users },
   { id: 'outlets', label: 'Outlets', icon: MapPin },
   
-  { section: 'Resources' },
+  { section: 'System Control' },
+  { id: 'audit', label: 'System Audit', icon: ShieldCheck },
   { id: 'gallery', label: 'Media Assets', icon: Image },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -126,6 +129,7 @@ export default function App() {
     daily_closing: <DailyClosingERP />,
     opening_times: <OpeningTimes />,
     gallery: <GalleryPage user={user} />,
+    audit: <AuditReportPage />,
     settings: <Settings />,
   };
 

@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  browserSessionPersistence,
+  browserLocalPersistence,
   setPersistence
 } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -35,8 +35,8 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    // Force session persistence
-    setPersistence(auth, browserSessionPersistence).catch(err => console.error("Persistence error:", err));
+    // Force local persistence for better UX (no logout on refresh)
+    setPersistence(auth, browserLocalPersistence).catch(err => console.error("Persistence error:", err));
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setError(null);

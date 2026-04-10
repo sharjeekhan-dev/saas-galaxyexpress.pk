@@ -235,16 +235,18 @@ app.get('/api/setup/bypass', async (req, res) => {
     const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
 
     res.send(`
-      <div style="background: #000; color: #39FF14; font-family: monospace; padding: 50px; text-align: center; min-height: 100vh;">
-        <h1 style="text-shadow: 0 0 15px #39FF14;">CORE BYPASS AUTHORIZED</h1>
-        <div id="status" style="margin: 20px 0; color: #fff; font-size: 0.9rem;">Identity Synchronized ✓</div>
-        <button id="btn" onclick="initialize()" style="padding: 20px 40px; font-weight: 800; background: #39FF14; color: #000; border: none; cursor: pointer; border-radius: 8px; font-size: 1.2rem;">ENTER SYSTEM NOW</button>
+      <div style="background: #000; color: #39FF14; font-family: 'Courier New', monospace; padding: 50px; text-align: center; min-height: 100vh;">
+        <h1 style="text-shadow: 0 0 20px #39FF14; margin-bottom: 30px;">⚡ GALAXY EXPRESS ROOT INITIALIZATION</h1>
+        <div id="log" style="background: rgba(57,255,20,0.05); border: 1px solid #39FF14; padding: 20px; text-align: left; max-width: 650px; margin: 0 auto; min-height: 200px; border-radius: 8px; font-size: 0.9rem; line-height: 1.6;">
+          <p style="color: #fff; margin: 0;">[SYSTEM] Identity Protocol Ready...</p>
+        </div>
+        <button id="btn" onclick="startRootProtocol()" style="margin-top: 30px; padding: 20px 50px; background: #39FF14; color: #000; border: none; font-weight: 900; cursor: pointer; border-radius: 4px; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px;">Initialize Master Session</button>
         
         <script type="module">
-          import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+          import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
           import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
           
-          const firebaseConfig = { 
+          const config = {
             apiKey: "AIzaSyBhj3W49UOLoZYB9MzAJYBsN2m2yUHixks",
             authDomain: "galaxy-express-saas.firebaseapp.com",
             projectId: "galaxy-express-saas",
@@ -253,28 +255,41 @@ app.get('/api/setup/bypass', async (req, res) => {
             appId: "1:1064319458646:web:849621950588983e078af7"
           };
           
-          window.initialize = async () => {
-            document.getElementById('btn').innerText = 'CRITICAL SYNC...';
-            const log = (m) => document.getElementById('status').innerText = m;
+          window.startRootProtocol = async () => {
+            const btn = document.getElementById('btn');
+            const logBox = document.getElementById('log');
+            const addLog = (msg, color = '#39FF14') => {
+              logBox.innerHTML += \`<div style="color: \${color}">[\${new Date().toLocaleTimeString()}] \${msg}</div>\`;
+              logBox.scrollTop = logBox.scrollHeight;
+            };
+            
+            btn.disabled = true;
+            btn.innerText = 'INITIALIZING...';
             
             try {
-              // 1. Firebase Auth Sync
-              const app = initializeApp(firebaseConfig);
+              addLog("Contacting Firebase Authorization Cluster...");
+              const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
               const auth = getAuth(app);
-              log("Authenticating with Firebase Cluster...");
-              await signInWithCustomToken(auth, '${customToken}');
               
-              // 2. Dashboard Storage Sync
-              log("Injecting Master Session...");
+              addLog("Validating Master Credentials...");
+              await signInWithCustomToken(auth, '${customToken}');
+              addLog("Firebase Auth Handshake: SUCCESS", "#fff");
+              
+              addLog("Injecting Local Security Tokens...");
               localStorage.setItem('erp_token', '${token}');
               localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
+              addLog("Master Session Profile: PERSISTED", "#fff");
               
-              log("SUCCESS: Redirecting...");
-              window.location.href = 'https://partner.galaxyexpress.pk';
-            } catch (e) {
-              console.error(e);
-              log("RECOVERY ERROR: " + e.message);
-              document.getElementById('btn').style.background = 'red';
+              addLog("Redirecting to Command Center...");
+              setTimeout(() => {
+                window.location.href = 'https://partner.galaxyexpress.pk';
+              }, 1500);
+            } catch (err) {
+              console.error(err);
+              addLog("MISSION FAILED: " + err.message, "red");
+              btn.style.background = 'maroon';
+              btn.style.color = '#fff';
+              btn.innerText = 'FIX REQUIRED';
             }
           };
         </script>
