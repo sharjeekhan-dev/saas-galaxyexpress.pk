@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // 1. PRIMARY: Try Local API Login (Custom Backend)
       // This is now the source of truth for all users including Master Admin.
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/login`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk'}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email?.trim(), phone, password })
