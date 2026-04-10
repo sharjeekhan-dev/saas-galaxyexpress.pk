@@ -11,6 +11,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
@@ -209,8 +210,8 @@ app.get('/api/setup/bypass', async (req, res) => {
   const pass = 'sharjeel123';
   
   try {
-    const { db: firestore } = await import('./firebase-admin.js');
-    const auth = (await import('firebase-admin')).default.auth();
+    const auth = admin.auth();
+    const firestore = admin.firestore();
     
     // 1. Ensure User In Firebase Auth
     let fbUser;
@@ -221,52 +222,66 @@ app.get('/api/setup/bypass', async (req, res) => {
       fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
     }
 
-    // 2. Generate Custom Token
-    const customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
+    // 2. Sync Firestore Record (Crucial for rules)
+    await firestore.collection('users').doc(fbUser.uid).set({
+      email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
+      status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
+    }, { merge: true });
 
-    // 3. Generate Local JWT
+    // 3. Generate Custom Token & JWT
+    const customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
     const masterPayload = { id: fbUser.uid, role: 'SUPER_ADMIN', tenantId: null };
     const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
-    
     const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
 
     res.send(`
-      <div style="background: #000; color: #39FF14; font-family: sans-serif; padding: 50px; text-align: center; min-height: 100vh;">
+      <div style="background: #000; color: #39FF14; font-family: monospace; padding: 50px; text-align: center; min-height: 100vh;">
         <h1 style="text-shadow: 0 0 15px #39FF14;">CORE BYPASS AUTHORIZED</h1>
-        <p>Your session is being prepared with full real-time capabilities.</p>
-        <button id="btn" onclick="initialize()" style="padding: 20px 40px; font-weight: 800; background: #39FF14; color: #000; border: none; cursor: pointer; border-radius: 8px; margin-top: 30px; font-size: 1.2rem;">ENTER SYSTEM NOW</button>
+        <div id="status" style="margin: 20px 0; color: #fff; font-size: 0.9rem;">Identity Synchronized ✓</div>
+        <button id="btn" onclick="initialize()" style="padding: 20px 40px; font-weight: 800; background: #39FF14; color: #000; border: none; cursor: pointer; border-radius: 8px; font-size: 1.2rem;">ENTER SYSTEM NOW</button>
         
         <script type="module">
           import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
           import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
           
-          const firebaseConfig = { projectId: "${process.env.FIREBASE_PROJECT_ID || 'galaxy-express-saas'}" }; // Add other fields if needed, or it works with project ID
+          const firebaseConfig = { 
+            apiKey: "AIzaSyBhj3W49UOLoZYB9MzAJYBsN2m2yUHixks",
+            authDomain: "galaxy-express-saas.firebaseapp.com",
+            projectId: "galaxy-express-saas",
+            storageBucket: "galaxy-express-saas.firebasestorage.app",
+            messagingSenderId: "1064319458646",
+            appId: "1:1064319458646:web:849621950588983e078af7"
+          };
           
           window.initialize = async () => {
-            document.getElementById('btn').innerText = 'SYNCHRONIZING...';
+            document.getElementById('btn').innerText = 'CRITICAL SYNC...';
+            const log = (m) => document.getElementById('status').innerText = m;
             
-            // Save local credentials
-            localStorage.setItem('erp_token', '${token}');
-            localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
-            
-            // Firebase Custom Token Auth (for real-time Firestore sync)
             try {
+              // 1. Firebase Auth Sync
               const app = initializeApp(firebaseConfig);
               const auth = getAuth(app);
+              log("Authenticating with Firebase Cluster...");
               await signInWithCustomToken(auth, '${customToken}');
-              console.log("Firebase Authenticated");
+              
+              // 2. Dashboard Storage Sync
+              log("Injecting Master Session...");
+              localStorage.setItem('erp_token', '${token}');
+              localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
+              
+              log("SUCCESS: Redirecting...");
+              window.location.href = 'https://partner.galaxyexpress.pk';
             } catch (e) {
-              console.warn("Firebase sync failed:", e.message);
+              console.error(e);
+              log("RECOVERY ERROR: " + e.message);
+              document.getElementById('btn').style.background = 'red';
             }
-            
-            // Redirect to dashboard immediately
-            window.location.href = 'https://partner.galaxyexpress.pk';
           };
         </script>
       </div>
     `);
   } catch (err) {
-    res.status(500).send("Bypass Failed: " + err.message);
+    res.status(500).send("Bypass Component Error: " + err.message);
   }
 });
 
