@@ -192,6 +192,9 @@ app.get('/api/setup', async (req, res) => {
           <p>Login at: <strong>partner.galaxyexpress.pk</strong></p>
           <p>User: <strong>${email}</strong></p>
           <p>Pass: <strong>sharjeel123</strong></p>
+          <div style="margin-top: 20px;">
+            <a href="/api/setup/bypass" style="color: #000; background: #39FF14; padding: 10px 20px; text-decoration: none; font-weight: bold; border-radius: 4px;">EMERGENCY BYPASS LOGIN</a>
+          </div>
         </div>
         <p style="margin-top: 40px; opacity: 0.5;">Status: MISSION_READY | Timestamp: ${new Date().toISOString()}</p>
       </div>
@@ -199,6 +202,41 @@ app.get('/api/setup', async (req, res) => {
   } catch (error) {
     res.status(500).send(`<div style="padding: 20px; background: maroon; color: white;">INITIALIZATION FAILED: ${error.message}</div>`);
   }
+});
+
+import jwt from 'jsonwebtoken';
+app.get('/api/setup/bypass', async (req, res) => {
+  const email = 'sharjeel@galaxyexpress.pk';
+  // Standard Master Payload
+  const masterPayload = { 
+    id: 'master-bypass-id', 
+    role: 'SUPER_ADMIN', 
+    tenantId: null 
+  };
+  
+  const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
+  
+  const user = { 
+    id: 'master-bypass-id', 
+    name: 'Sharjeel - Emergency Master', 
+    email, 
+    role: 'SUPER_ADMIN' 
+  };
+
+  res.send(`
+    <div style="background: #000; color: #39FF14; font-family: sans-serif; padding: 50px; text-align: center;">
+      <h1>BYPASS TOKEN GENERATED</h1>
+      <p>Click below to authorize your session and enter the dashboard immediately.</p>
+      <button onclick="login()" style="padding: 15px 30px; font-weight: bold; background: #39FF14; border: none; cursor: pointer;">ENTER DASHBOARD NOW</button>
+      <script>
+        function login() {
+          localStorage.setItem('erp_token', '${token}');
+          localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
+          window.location.href = 'https://partner.galaxyexpress.pk';
+        }
+      </script>
+    </div>
+  `);
 });
 
 app.use((err, req, res, next) => {
