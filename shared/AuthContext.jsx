@@ -1,13 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from './firebase';
-import { 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  browserLocalPersistence,
-  setPersistence
-} from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -17,92 +8,46 @@ export const useAuth = () => {
   return context;
 };
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Initial Check: Try to recover local session immediately (Ensures Zero-Latency for Master Admin)
-    const localUserJson = localStorage.getItem('erp_user');
-    if (localUserJson) {
-      try {
-        const localUser = JSON.parse(localUserJson);
-        setUser(localUser);
-        console.log("💾 Recovered session from local storage");
-      } catch (e) {
-        console.warn("⚠️ Failed to parse local session:", e);
-      }
-    }
+    // 1. Initial Check: Try to recover local session
+    const initializeAuth = async () => {
+      const localUserJson = localStorage.getItem('erp_user');
+      const token = localStorage.getItem('erp_token');
 
-    // Force local persistence for better UX (no logout on refresh)
-    setPersistence(auth, browserLocalPersistence).catch(err => console.error("Persistence error:", err));
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setError(null);
-      
-      if (firebaseUser) {
-        setLoading(true);
+      if (localUserJson && token) {
         try {
-          // Get additional user data from Firestore
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const localUser = JSON.parse(localUserJson);
+          setUser(localUser);
           
-          // Use onSnapshot for real-time user profile updates (role changes, active status, etc.)
-          const unsubProfile = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-              const userData = docSnap.data();
-              
-              if (userData.isActive === false) {
-                signOut(auth);
-                setUser(null);
-                setError('Account is deactivated');
-              } else {
-                setUser({
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  ...userData
-                });
-                
-                // Save token to localStorage for backend API compatibility
-                firebaseUser.getIdToken().then(token => {
-                  localStorage.setItem('erp_token', token);
-                });
-              }
-            } else {
-              // User documented doesn't exist in Firestore
-              console.error("User profile not found in Firestore for UID:", firebaseUser.uid);
-              setUser({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                role: 'GUEST'
-              });
-            }
-            setLoading(false);
-          }, (err) => {
-            console.error("Profile listener error:", err);
-            setError("Failed to sync user profile");
-            setLoading(false);
+          // Verify token/session with backend
+          const response = await fetch(`${API_URL}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
           });
-
-          return () => unsubProfile();
-
-        } catch (err) {
-          console.error("Auth sync error:", err);
-          setError(err.message);
-          setLoading(false);
+          
+          if (response.ok) {
+            const freshUser = await response.json();
+            setUser(freshUser);
+            localStorage.setItem('erp_user', JSON.stringify(freshUser));
+          } else {
+            // Token expired or user deleted
+            logout();
+          }
+        } catch (e) {
+          console.warn("⚠️ Auth initialization failed:", e);
+          logout();
         }
-      } else {
-        // Only clear if we don't already have a local/master session active
-        const hasLocalSession = localStorage.getItem('erp_user');
-        if (!hasLocalSession) {
-          setUser(null);
-          localStorage.removeItem('erp_token');
-        }
-        setLoading(false);
       }
-    });
+      setLoading(false);
+    };
 
-    return () => unsubscribe();
+    initializeAuth();
   }, []);
 
   const login = async (credentials) => {
@@ -111,9 +56,7 @@ export const AuthProvider = ({ children }) => {
     const { email, phone, password } = credentials;
 
     try {
-      // 1. PRIMARY: Try Local API Login (Custom Backend)
-      // This is now the source of truth for all users including Master Admin.
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://api.galaxyexpress.pk'}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email?.trim(), phone, password })
@@ -121,23 +64,10 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
-        const localUser = {
-          uid: data.user.id || 'master-local-session',
-          ...data.user
-        };
-        setUser(localUser);
+        setUser(data.user);
         localStorage.setItem('erp_token', data.token);
-        localStorage.setItem('erp_user', JSON.stringify(localUser));
-        
-        // Optional: Sync with Firebase Auth for real-time features if needed
-        if (email) {
-          signInWithEmailAndPassword(auth, email.trim(), password).catch(e => 
-            console.warn("🔐 Firebase sync skipped:", e.message)
-          );
-        }
-
-        setLoading(false);
-        return localUser;
+        localStorage.setItem('erp_user', JSON.stringify(data.user));
+        return data.user;
       } else {
         const errData = await response.json();
         throw new Error(errData.error || 'Authentication Failed');
@@ -150,28 +80,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    // If we have a local session saved, use it as initial state
-    const savedUser = localStorage.getItem('erp_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-        setLoading(false);
-      } catch (e) {
-        localStorage.removeItem('erp_user');
-      }
-    }
-  }, []);
-
-  const logout = async () => {
-    try {
-      await signOut(auth);
-      localStorage.removeItem('erp_token');
-      localStorage.removeItem('erp_user');
-      setUser(null);
-    } catch (err) {
-      console.error("Logout error:", err);
-    }
+  const logout = () => {
+    localStorage.removeItem('erp_token');
+    localStorage.removeItem('erp_user');
+    setUser(null);
+    // Optional: Redirect to login page
+    window.location.href = '/login';
   };
 
   const value = {
@@ -189,7 +103,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

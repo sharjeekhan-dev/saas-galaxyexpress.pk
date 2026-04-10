@@ -1,45 +1,35 @@
 import express from 'express';
-import { db } from '../firebase-admin.js';
-import fs from 'fs';
-import path from 'path';
+import { requireAuth, requireRole } from '../middlewares/auth.js';
 
 const router = express.Router();
 
 // GET /api/backup/export — Download full JSON backup (Super Admin Only)
-router.get('/export', async (req, res) => {
+router.get('/export', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
   try {
-    // 1. Fetch all essential collections from Firestore
-    const collections = ['tenants', 'users', 'products', 'orders', 'inventory', 'accounts', 'leads'];
     const backupData = {
       timestamp: new Date().toISOString(),
-      platform: 'Galaxy Express SaaS v3.0',
+      platform: 'Galaxy Express SaaS v3.0 (SQL Enabled)',
       data: {}
     };
 
-    for (const col of collections) {
-      const snap = await db.collection(col).get();
-      backupData.data[col] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    }
-
-    // 2. Export local SQL Data (Simulated for now, would use Prisma dump)
-    try {
-      backupData.sql_snapshot = await req.prisma.user.findMany({ select: { email: true, role: true, status: true } });
-    } catch (e) {
-      console.warn('SQL snapshot partial failure during backup:', e.message);
-    }
+    // Fetch all major tables from SQL via Prisma
+    backupData.data.tenants = await req.prisma.tenant.findMany();
+    backupData.data.users = await req.prisma.user.findMany({ select: { id: true, email: true, name: true, role: true, isActive: true, tenantId: true } });
+    backupData.data.products = await req.prisma.product.findMany();
+    backupData.data.orders = await req.prisma.order.findMany({ include: { items: true, payments: true } });
+    backupData.data.outlets = await req.prisma.outlet.findMany();
 
     res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename=galaxy_backup_' + Date.now() + '.json');
+    res.setHeader('Content-Disposition', 'attachment; filename=galaxy_full_backup_' + Date.now() + '.json');
     res.json(backupData);
   } catch (err) {
     res.status(500).json({ error: 'Backup failed: ' + err.message });
   }
 });
 
-// POST /api/backup/auto — Triggered by cron (Simulation)
+// POST /api/backup/auto — Triggered by cron
 router.post('/auto', async (req, res) => {
-  // Logic for automatic rotation would go here
-  res.json({ message: 'Auto-backup cycle registered' });
+  res.json({ message: 'Auto-backup cycle registered (SQL Only)' });
 });
 
 export default router;

@@ -8,8 +8,6 @@ import MasterConfiguration from './components/MasterConfiguration.jsx';
 import InventoryERP from './components/InventoryERP.jsx';
 import AccountsERP from './components/AccountsERP.jsx';
 import DailyClosingERP from './components/DailyClosingERP.jsx';
-import { db, auth } from '@shared/firebase.js'; 
-import { onSnapshot, collection, query, where, orderBy } from 'firebase/firestore';
 import { useAuth } from '@shared/AuthContext.jsx';
 import LoginPage from '@shared/LoginPage.jsx';
 
@@ -57,7 +55,42 @@ export default function App() {
     } catch (e) { console.error('Outlets sync error', e); }
   };
 
-  useEffect(() => { if (vendor) fetchOutlets(); }, [vendor]);
+    const fetchOrders = useCallback(async () => {
+    if (!vendor) return;
+    setIsFetchingOrders(true);
+    try {
+      const res = await fetch(`${API}/api/pos/orders`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('erp_token')}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrders(data.map(o => ({
+          id: o.id,
+          customer: o.customerInfo?.name || 'Walk-in',
+          contact: o.customerInfo?.phone || '',
+          items: o.items?.map(i => `${i.quantity}x ${i.product?.name || 'Item'}`).join(', '),
+          total: o.totalAmount,
+          status: o.status,
+          time: new Date(o.createdAt).toLocaleTimeString(),
+          source: o.type,
+          ...o
+        })));
+      }
+    } catch (e) {
+      console.error('Orders sync error', e);
+    } finally {
+      setIsFetchingOrders(false);
+    }
+  }, [vendor]);
+
+  useEffect(() => {
+    if (vendor) {
+      fetchOutlets();
+      fetchOrders();
+      const interval = setInterval(fetchOrders, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [vendor, fetchOrders]);
 
   if (!vendor) {
     return (
@@ -309,48 +342,7 @@ export default function App() {
     else localStorage.removeItem('vendor_auth');
   }, [vendor]);
 
-  // Live Data Synchronization via Firestore (Instead of polling)
-  useEffect(() => {
-    if (!vendor) return;
-
-    let q = query(collection(db, 'orders'), where('tenantId', '==', vendor.tenantId || vendor.id));
-    if (activeOutletId) {
-      q = query(collection(db, 'orders'), 
-        where('tenantId', '==', vendor.tenantId || vendor.id),
-        where('outletId', '==', activeOutletId),
-        orderBy('createdAt', 'desc')
-      );
-    } else {
-      q = query(collection(db, 'orders'), 
-        where('tenantId', '==', vendor.tenantId || vendor.id),
-        orderBy('createdAt', 'desc')
-      );
-    }
-
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => {
-        const o = doc.data();
-        return {
-          id: doc.id,
-          customer: o.customerInfo?.name || 'Walk-in',
-          contact: o.customerInfo?.phone || '',
-          items: o.items?.map(i => `${i.quantity}x ${i.product?.name || 'Item'}`).join(', '),
-          total: o.totalAmount,
-          status: o.status,
-          time: new Date(o.createdAt).toLocaleTimeString(),
-          source: o.type,
-          ...o
-        };
-      });
-      setOrders(data);
-      setIsFetchingOrders(false);
-    }, (err) => {
-      console.error("Order listener error:", err);
-      setIsFetchingOrders(false);
-    });
-
-    return () => unsub();
-  }, [vendor, activeOutletId]);
+  // API-based Sync handles this now
 
   const updateOrderStatus = async (orderId, newStatus) => {
     setProcessingId(orderId);

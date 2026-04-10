@@ -3,8 +3,7 @@ import {
   Building, Plus, Edit, XCircle, X, Check, Shield, 
   ToggleLeft, ToggleRight, Calendar, Package, Users, Store, Laptop, BarChart3, Receipt
 } from 'lucide-react';
-import { db } from '@shared/firebase.js';
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { API } from '../App.jsx';
 
 const PLAN_COLOR = { BASIC: 'badge-default', PRO: 'badge-cyan', ENTERPRISE: 'badge-purple' };
 
@@ -21,7 +20,6 @@ export default function TenantsPage({ tenants, onRefresh }) {
       plan: f.get('plan'),
       billingExpiry: f.get('billingExpiry'),
       isActive: f.get('isActive') === 'on',
-      updatedAt: serverTimestamp(),
       featureToggles: {
         pos: f.get('toggle_pos') === 'on',
         inventory: f.get('toggle_inventory') === 'on',
@@ -37,34 +35,35 @@ export default function TenantsPage({ tenants, onRefresh }) {
     };
 
     try {
-      if (editingTenant) {
-        await updateDoc(doc(db, 'tenants', editingTenant.id), body);
+      const url = editingTenant ? `${API}/api/tenant/${editingTenant.id}` : `${API}/api/tenant`;
+      const res = await fetch(url, {
+        method: editingTenant ? 'PUT' : 'POST',
+        headers: headers(),
+        body: JSON.stringify(body)
+      });
+      
+      if (res.ok) {
+        setShowModal(false);
+        setEditingTenant(null);
+        onRefresh();
       } else {
-        await addDoc(collection(db, 'tenants'), {
-          ...body,
-          createdAt: serverTimestamp(),
-          isSuspended: false
-        });
+        const err = await res.json();
+        alert(err.error || 'Operation failed');
       }
-      setShowModal(false);
-      setEditingTenant(null);
     } catch (err) { 
-      console.error(err);
-      alert('Operation failed: ' + err.message); 
+      alert('Network error'); 
     }
   };
 
   const suspend = async (id) => {
-    if (!confirm('Suspend this tenant?')) return;
+    if (!confirm('Suspend this tenant and block all access?')) return;
     try { 
-      await updateDoc(doc(db, 'tenants', id), {
-        isActive: false,
-        isSuspended: true,
-        suspensionReason: 'Violation of terms or expiry.'
+      await fetch(`${API}/api/tenant/${id}/suspend`, {
+        method: 'PUT',
+        headers: headers()
       });
-    } catch (err) {
-      console.error(err);
-    }
+      onRefresh();
+    } catch (err) { alert('Suspension failed'); }
   };
 
   return (

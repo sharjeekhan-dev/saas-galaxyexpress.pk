@@ -1,9 +1,6 @@
 import express from 'express';
 import { requireAuth, requireTenant } from '../middlewares/auth.js';
 import { z } from 'zod';
-import admin from 'firebase-admin';
-import { db } from '../firebase-admin.js';
-
 const router = express.Router();
 
 // GET /api/pos/products
@@ -153,24 +150,6 @@ router.post('/orders', requireAuth, requireTenant, async (req, res) => {
       }
     }
 
-    // 4. Sync to Firestore for real-time Dashboard access
-    try {
-      if (db) {
-        await db.collection('orders').doc(order.id).set({
-          ...order,
-          createdAt: order.createdAt.toISOString(),
-          updatedAt: order.updatedAt.toISOString(),
-          items: order.items.map(i => ({
-            ...i,
-            product: { name: i.product.name, category: i.product.category }
-          }))
-        });
-        console.log('✅ Firestore Sync Success:', order.id);
-      }
-    } catch (fsErr) {
-      console.warn('⚠️ Firestore Sync Failed:', fsErr.message);
-    }
-
     req.io.to(`outlet_${data.outletId}`).emit('order_created', order);
     res.status(201).json(order);
   } catch (error) { res.status(500).json({ error: error.message }); }
@@ -215,18 +194,6 @@ router.put('/orders/:id/status', requireAuth, requireTenant, async (req, res) =>
       if (activeOrders === 0) {
         await req.prisma.table.update({ where: { id: existing.tableId }, data: { isOccupied: false } });
       }
-    }
-
-    // Update Firestore
-    try {
-      if (db) {
-        await db.collection('orders').doc(order.id).update({ 
-          status: order.status,
-          updatedAt: order.updatedAt.toISOString()
-        });
-      }
-    } catch (e) {
-      console.warn('⚠️ Firestore Update Failed:', e.message);
     }
 
     req.io.to(`outlet_${order.outletId}`).emit('order_status_changed', order);
@@ -359,6 +326,48 @@ router.get('/orders/:id/invoice', requireAuth, requireTenant, async (req, res) =
       payments: order.payments.map(p => ({ method: p.method, amount: p.amount, status: p.status })),
     };
     res.json(invoice);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/pos/orders/:id — soft delete
+router.delete('/orders/:id', requireAuth, requireTenant, async (req, res) => {
+  try {
+    await req.prisma.order.update({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      data: { deletedAt: new Date() }
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// POST /api/pos/orders/:id/restore
+router.post('/orders/:id/restore', requireAuth, requireTenant, async (req, res) => {
+  try {
+    await req.prisma.order.update({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      data: { deletedAt: null }
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// PUT /api/pos/orders/:id/rename
+router.put('/orders/:id/rename', requireAuth, requireTenant, async (req, res) => {
+  try {
+    const { renamedTo } = req.body;
+    await req.prisma.order.update({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      data: { renamedTo }
+    });
+    res.json({ success: true });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// DELETE /api/pos/orders/:id/permanent
+router.delete('/orders/:id/permanent', requireAuth, requireTenant, async (req, res) => {
+  try {
+    await req.prisma.order.delete({ where: { id: req.params.id, tenantId: req.user.tenantId } });
+    res.json({ success: true });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 

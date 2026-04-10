@@ -22,13 +22,17 @@ import OpeningTimes from './components/OpeningTimes.jsx';
 import GalleryPage from './components/GalleryPage.jsx';
 import ProfileModal from './components/ProfileModal.jsx';
 import AuditReportPage from './components/AuditReportPage.jsx';
-import Settings from './components/SettingsPage.jsx';
+import SettingsPage from './components/SettingsPage.jsx';
+import UsersPage from './components/UsersPage.jsx';
+import ApiConfigPanel from './components/ApiConfigPanel.jsx';
 import LoginPage from '@shared/LoginPage.jsx';
 import { useAuth } from '@shared/AuthContext.jsx';
-import { db } from '@shared/firebase.js';
-import { onSnapshot, collection, query, where, orderBy, doc } from 'firebase/firestore';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const headers = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${localStorage.getItem('erp_token')}`
+});
 
 // ─── UNIFIED NAV CONFIG ──────────────────────────────────────────────────
 const NAV = [
@@ -53,6 +57,7 @@ const NAV = [
   { id: 'outlets', label: 'Outlets', icon: MapPin },
   
   { section: 'System Control' },
+  { id: 'api_config', label: 'API Config', icon: Key, role: 'SUPER_ADMIN' },
   { id: 'audit', label: 'System Audit', icon: ShieldCheck },
   { id: 'gallery', label: 'Media Assets', icon: Image },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -67,7 +72,7 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   
   const [data, setData] = useState({
-    tenants: [], stats: { totalOrders: 0, totalRevenue: 0 }, orders: []
+    tenants: [], stats: { totalOrders: 0, totalRevenue: 0 }, orders: [], users: []
   });
 
   // Re-sync theme
@@ -77,53 +82,61 @@ export default function App() {
     localStorage.setItem('erp_theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  // Real-time Data Sync
+  // Auth Bridge
   useEffect(() => {
-    // CROSS-DOMAIN AUTH BRIDGE: Intercept bypass tokens from the API domain
     const params = new URLSearchParams(window.location.search);
     const bridgeToken = params.get('bridge_token');
     const bridgeUser = params.get('bridge_user');
 
     if (bridgeToken && bridgeUser) {
-      try {
-        localStorage.setItem('erp_token', bridgeToken);
-        localStorage.setItem('erp_user', bridgeUser);
-        // Clean URL to prevent re-triggering
-        const url = new URL(window.location);
-        url.searchParams.delete('bridge_token');
-        url.searchParams.delete('bridge_user');
-        window.history.replaceState({}, '', url);
-        window.location.reload(); // Boot with new credentials
-      } catch (e) {
-        console.error("Auth Bridge Failed:", e);
-      }
+      localStorage.setItem('erp_token', bridgeToken);
+      localStorage.setItem('erp_user', bridgeUser);
+      const url = new URL(window.location);
+      url.searchParams.delete('bridge_token');
+      url.searchParams.delete('bridge_user');
+      window.history.replaceState({}, '', url);
+      window.location.reload();
     }
   }, []);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!isAuthenticated) return;
+    try {
+      // Fetch Tenants
+      if (isAdmin) {
+        const tRes = await fetch(`${API}/api/tenant`, { headers: headers() });
+        if (tRes.ok) {
+          const tData = await tRes.json();
+          setData(prev => ({ ...prev, tenants: tData }));
+        }
+      }
 
-    // Tenants Listener (Super Admin only)
-    let unsubTenants = () => {};
-    if (isAdmin) {
-      unsubTenants = onSnapshot(collection(db, 'tenants'), (snap) => {
-        setData(prev => ({ ...prev, tenants: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
-      });
+      // Fetch Orders
+      const orderUrl = activeTenant 
+        ? `${API}/api/pos/orders?tenantId=${activeTenant.id}`
+        : `${API}/api/pos/orders`;
+      const oRes = await fetch(orderUrl, { headers: headers() });
+      if (oRes.ok) {
+        const oData = await oRes.json();
+        setData(prev => ({ ...prev, orders: oData }));
+      }
+
+      // Fetch Users
+      const uRes = await fetch(`${API}/api/users`, { headers: headers() });
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        setData(prev => ({ ...prev, users: uData }));
+      }
+    } catch (err) {
+      console.error('Data fetch error:', err);
     }
+  }, [isAuthenticated, isAdmin, activeTenant]);
 
-    // Orders Listener (Scoped to context)
-    const targetId = activeTenant?.id || user?.tenantId || user?.id;
-    const qOrders = query(
-      collection(db, 'orders'),
-      where('tenantId', '==', targetId),
-      orderBy('createdAt', 'desc')
-    );
-    const unsubOrders = onSnapshot(qOrders, (snap) => {
-      setData(prev => ({ ...prev, orders: snap.docs.map(d => ({ id: d.id, ...d.data() })) }));
-    });
-
-    return () => { unsubTenants(); unsubOrders(); };
-  }, [isAuthenticated, isAdmin, activeTenant, user]);
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   if (loading) return (
     <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#050906' }}>
@@ -142,8 +155,8 @@ export default function App() {
 
   const renders = {
     dashboard: <DashboardPage stats={data.stats} orders={data.orders} onNav={setPage} />,
-    tenants: <TenantsPage tenants={data.tenants} />,
-    orders: <OrdersPage orders={data.orders} />,
+    tenants: <TenantsPage tenants={data.tenants} onRefresh={fetchData} />,
+    orders: <OrdersPage orders={data.orders} onRefresh={fetchData} />,
     pos: <POSTerminal products={[]} />,
     menu: <MenuManagement API={API} vendor={user} />,
     inventory: <InventoryERP />,
@@ -152,7 +165,9 @@ export default function App() {
     opening_times: <OpeningTimes />,
     gallery: <GalleryPage user={user} />,
     audit: <AuditReportPage />,
-    settings: <Settings />,
+    settings: <SettingsPage />,
+    users: <UsersPage users={data.users} onRefresh={fetchData} />,
+    api_config: <ApiConfigPanel />,
   };
 
   const navItems = NAV.filter(n => !n.role || (n.role === 'SUPER_ADMIN' && isAdmin));
@@ -190,7 +205,7 @@ export default function App() {
              <div className="user-avatar">{user.name?.[0].toUpperCase()}</div>
              <div className="user-info">
                <div className="user-name">{user.name}</div>
-               <div className="user-role">{isAdmin ? 'Super Admin' : 'Vendor'}</div>
+               <div className="user-role">{isAdmin ? 'Super Admin' : (user.role || 'User')}</div>
              </div>
              <UserCog size={14} />
           </div>
@@ -203,7 +218,7 @@ export default function App() {
            <button className="hamburger-btn" style={{ display: 'flex' }} onClick={() => setSidebarOpen(!sidebarOpen)}>
              <Menu size={18} />
            </button>
-           <h1 className="page-title">{page.toUpperCase()}</h1>
+           <h1 className="page-title">{page.replace('_', ' ').toUpperCase()}</h1>
         </div>
 
         {isAdmin && (
@@ -223,6 +238,9 @@ export default function App() {
         )}
 
         <div className="topbar-right">
+          <button className="topbar-btn" title="Refresh Data" onClick={fetchData}>
+             <RefreshCw size={16} />
+          </button>
           <button className="topbar-btn" onClick={() => setIsDark(!isDark)}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>

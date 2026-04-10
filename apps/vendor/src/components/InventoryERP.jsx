@@ -5,8 +5,6 @@ import {
   Factory, ShieldCheck, AlertTriangle, Trash2, ClipboardList 
 } from 'lucide-react';
 import { API } from '../App.jsx';
-import { db } from '@shared/firebase';
-import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 
 export default function InventoryERP({ vendor, theme }) {
@@ -65,17 +63,8 @@ export default function InventoryERP({ vendor, theme }) {
 
   useEffect(() => { 
     fetchData(); 
-
-    // LIVE STOCK LISTENER FROM FIREBASE
-    const q = query(collection(db, "stock"), where("tenantId", "==", vendor.tenantId || "default"));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const stockData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setData(prev => ({ ...prev, stock: stockData }));
-    }, (error) => {
-      console.error("Firestore Listener Error:", error);
-    });
-
-    return () => unsub(); // Cleanup on unmount
+    const interval = setInterval(fetchData, 30000); // Poll every 30s
+    return () => clearInterval(interval);
   }, [vendor]);
 
 

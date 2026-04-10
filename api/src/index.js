@@ -1,4 +1,4 @@
-import './firebase-admin.js'; // MUST BE FIRST TO INITIALIZE FIREBASE BEFORE ROUTES
+// Main Index File
 import express from 'express';
 import http from 'http';
 import { exec } from 'child_process';
@@ -15,7 +15,7 @@ import jwt from 'jsonwebtoken';
 
 dotenv.config();
 
-import admin from 'firebase-admin';
+
 
 const app = express();
 const server = http.createServer(app);
@@ -170,14 +170,7 @@ app.get('/api/setup', async (req, res) => {
     });
     log.masterAccount = 'SQL: OK';
 
-    const { db: firestore } = await import('./firebase-admin.js');
-    if (firestore) {
-      await firestore.collection('users').doc('master-admin').set({
-        email, password: hashedPassword, name: 'Sharjeel - Galaxy Master', 
-        role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true
-      }, { merge: true });
-      log.masterAccount += ' | Firestore: OK';
-    }
+    log.masterAccount = 'SQL: OK';
 
     res.send(`
       <div style="background: #000; color: #39FF14; font-family: 'Courier New', monospace; padding: 50px; min-height: 100vh;">
@@ -207,46 +200,13 @@ app.get('/api/setup', async (req, res) => {
 
 app.get('/api/setup/bypass', async (req, res) => {
   const email = 'sharjeel@galaxyexpress.pk';
-  const pass = 'sharjeel123';
   
   try {
-    const auth = admin.auth();
-    const firestore = admin.firestore();
-    
-    // 1. Attempt Firebase Auth / Firestore Sync with full crash-safety
-    let fbUser = { uid: 'master-offline-id' }; // Fallback ID if Firebase is completely dead
-    let syncStatus = "Recovery Mode Active (Local Auth Only)";
-    let customToken = null;
+    let syncStatus = "SQL Authentication Mode Active";
 
-    try {
-      if (admin.apps.length > 0 && admin.apps[0].options.credential) {
-        try {
-          fbUser = await auth.getUserByEmail(email);
-          await auth.updateUser(fbUser.uid, { password: pass });
-        } catch (e) {
-          fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
-        }
-
-        try {
-          await firestore.collection('users').doc(fbUser.uid).set({
-            email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
-            status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
-          }, { merge: true });
-          customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
-          syncStatus = "Identity Synchronized ✓";
-        } catch (e) {
-          console.warn("Firestore sync skipped:", e.message);
-        }
-      }
-    } catch (globalFbErr) {
-      console.error("🔥 Critical Firebase SDK Failure during bypass:", globalFbErr.message);
-      syncStatus = "Firebase Cluster Offline (Local Session Active)";
-    }
-
-    // 2. Generate Local JWT (Always works regardless of Firebase)
-    const masterPayload = { id: fbUser.uid, role: 'SUPER_ADMIN', tenantId: null };
-    const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
-    const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
+    const masterPayload = { id: 'master-sql-id', role: 'SUPER_ADMIN', tenantId: null };
+    const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '24h' });
+    const user = { id: 'master-sql-id', name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
 
     res.send(`
       <div style="background: #000; color: #39FF14; font-family: 'Courier New', monospace; padding: 50px; text-align: center; min-height: 100vh;">
@@ -257,24 +217,12 @@ app.get('/api/setup/bypass', async (req, res) => {
         </div>
         <button id="btn" onclick="startRootProtocol()" style="margin-top: 30px; padding: 20px 50px; background: #39FF14; color: #000; border: none; font-weight: 900; cursor: pointer; border-radius: 4px; font-size: 1.2rem; text-transform: uppercase;">Initialize Master Session</button>
         
-        <script type="module">
-          import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-          import { getAuth, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-          
-          const config = {
-            apiKey: "AIzaSyBhj3W49UOLoZYB9MzAJYBsN2m2yUHixks",
-            authDomain: "galaxy-express-saas.firebaseapp.com",
-            projectId: "galaxy-express-saas",
-            storageBucket: "galaxy-express-saas.firebasestorage.app",
-            messagingSenderId: "1064319458646",
-            appId: "1:1064319458646:web:849621950588983e078af7"
-          };
-          
+        <script>
           window.startRootProtocol = async () => {
             const btn = document.getElementById('btn');
             const logBox = document.getElementById('log');
             const addLog = (msg, color = '#39FF14') => {
-              logBox.innerHTML += \`<div style="color: \${color}">[\${new Date().toLocaleTimeString()}] \${msg}</div>\`;
+              logBox.innerHTML += '<div style="color: ' + color + '">[' + new Date().toLocaleTimeString() + '] ' + msg + '</div>';
               logBox.scrollTop = logBox.scrollHeight;
             };
             
@@ -282,23 +230,6 @@ app.get('/api/setup/bypass', async (req, res) => {
             btn.innerText = 'INITIALIZING...';
             
             try {
-              const customToken = ${customToken ? `'${customToken}'` : 'null'};
-              
-              if (customToken) {
-                addLog("Contacting Firebase Authorization Cluster...");
-                try {
-                  const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
-                  const auth = getAuth(app);
-                  addLog("Validating Master Credentials...");
-                  await signInWithCustomToken(auth, customToken);
-                  addLog("Firebase Auth Handshake: SUCCESS", "#fff");
-                } catch (e) {
-                  addLog("Warning: Firebase Handshake Skipped: " + e.message, "#f97316");
-                }
-              } else {
-                addLog("NOTICE: Proceeding with Local Identity Node (Real-time restricted)", "#0ea5e9");
-              }
-              
               addLog("Injecting Local Security Tokens...");
               localStorage.setItem('erp_token', '${token}');
               localStorage.setItem('erp_user', JSON.stringify(${JSON.stringify(user)}));
@@ -355,44 +286,27 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   
-  // Auto-inject Master Admin into Dual Persistence
   (async () => {
     try {
       const email = 'sharjeel@galaxyexpress.pk';
       const password = await bcrypt.hash('sharjeel123', 12);
       
-      // SQL Injection
-      try {
-        await prisma.user.upsert({
-          where: { email },
-          update: { password, role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true },
-          create: {
-            email,
-            password,
-            name: 'Sharjeel - Galaxy Express Super Admin',
-            role: 'SUPER_ADMIN',
-            status: 'APPROVED',
-            isActive: true
-          }
-        });
-        console.log('💎 GALAXY EXPRESS: Master Admin secured in SQL.');
-      } catch (e) { console.warn('⚠️ SQL Injection skipped.'); }
-
-      // Firestore Injection
-      const { db: firestore } = await import('./firebase-admin.js');
-      if (firestore) {
-         await firestore.collection('users').doc('master-admin').set({
-           email,
-           password,
-           name: 'Sharjeel - Galaxy Express Master',
-           role: 'SUPER_ADMIN',
-           status: 'APPROVED',
-           isActive: true
-         }, { merge: true });
-         console.log('🔥 GALAXY EXPRESS: Master Admin secured in Firestore.');
-      }
+      await prisma.user.upsert({
+        where: { email },
+        update: { password, role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true },
+        create: {
+          email,
+          password,
+          name: 'Sharjeel - Galaxy Express Super Admin',
+          role: 'SUPER_ADMIN',
+          status: 'APPROVED',
+          isActive: true
+        }
+      });
+      console.log('💎 GALAXY EXPRESS: Master Admin secured in SQL.');
     } catch (e) {
-      console.warn('⚠️ Master Injection error:', e.message);
+      console.warn('⚠️ Master Injection failed:', e.message);
     }
   })();
 });
+

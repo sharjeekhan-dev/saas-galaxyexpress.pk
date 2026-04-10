@@ -1,35 +1,31 @@
 import express from 'express';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
-import admin from 'firebase-admin';
-import { db } from '../firebase-admin.js';
 
 const router = express.Router();
 
 // GET /api/gallery — list media
 router.get('/', requireAuth, async (req, res) => {
   try {
-    if (!db) return res.json([]);
-    let query = db.collection('media');
-    
-    // Applying filters
     const { category, type } = req.query;
-    if (category) query = query.where('category', '==', category);
-    if (type) query = query.where('type', '==', type);
+    const where = {};
+    if (category) where.category = category;
+    if (type) where.type = type;
 
-    const snapshot = await query.get();
-    let media = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Vendor filtering logic: restricted to what Admin shares or their own
+    // RBAC: Vendor filtering logic
     if (req.user.role === 'VENDOR') {
-      media = media.filter(m => 
-        m.tenantId === req.user.tenantId || 
-        m.isPublic === true || 
-        m.category === 'CATEGORIES'
-      );
+      where.OR = [
+        { tenantId: req.user.tenantId },
+        { isPublic: true },
+        { category: 'CATEGORIES' }
+      ];
+    } else if (req.user.role !== 'SUPER_ADMIN') {
+      where.tenantId = req.user.tenantId;
     }
 
-    // Sort by createdAt desc
-    media.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const media = await req.prisma.media.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
 
     res.json(media);
   } catch (err) {
@@ -43,19 +39,18 @@ router.post('/', requireAuth, async (req, res) => {
     const { url, category, type, isPublic } = req.body;
     if (!url) return res.status(400).json({ error: 'URL required' });
 
-    const newMedia = {
-      url,
-      category: category || 'UNCATEGORIZED',
-      type: type || 'IMAGE',
-      isPublic: isPublic || false,
-      tenantId: req.user.tenantId || null,
-      userId: req.user.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    const media = await req.prisma.media.create({
+      data: {
+        url,
+        category: category || 'UNCATEGORIZED',
+        type: type || 'IMAGE',
+        isPublic: isPublic || false,
+        tenantId: req.user.tenantId || null,
+        userId: req.user.id
+      }
+    });
 
-    const docRef = await db.collection('media').add(newMedia);
-    res.status(201).json({ id: docRef.id, ...newMedia });
+    res.status(201).json(media);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -65,8 +60,11 @@ router.post('/', requireAuth, async (req, res) => {
 router.patch('/:id/public', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
   try {
     const { isPublic } = req.body;
-    await db.collection('media').doc(req.params.id).update({ isPublic, updatedAt: new Date().toISOString() });
-    res.json({ id: req.params.id, isPublic });
+    const media = await req.prisma.media.update({
+      where: { id: req.params.id },
+      data: { isPublic }
+    });
+    res.json(media);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -75,16 +73,15 @@ router.patch('/:id/public', requireAuth, requireRole(['SUPER_ADMIN']), async (re
 // DELETE /api/gallery/:id
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const doc = await db.collection('media').doc(req.params.id).get();
-    if (!doc.exists) return res.status(404).json({ error: 'Media not found' });
+    const media = await req.prisma.media.findUnique({ where: { id: req.params.id } });
+    if (!media) return res.status(404).json({ error: 'Media not found' });
     
-    const media = doc.data();
     // Only Admin or Owner can delete
     if (req.user.role !== 'SUPER_ADMIN' && media.userId !== req.user.id) {
        return res.status(403).json({ error: 'Unauthorized to delete this media' });
     }
 
-    await db.collection('media').doc(req.params.id).delete();
+    await req.prisma.media.delete({ where: { id: req.params.id } });
     res.json({ message: 'Media deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

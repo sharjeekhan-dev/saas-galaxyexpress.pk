@@ -2,8 +2,6 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import admin from 'firebase-admin';
-import { db } from '../firebase-admin.js';
 
 const router = express.Router();
 
@@ -33,42 +31,20 @@ router.post('/login', async (req, res) => {
 
     const { email, phone, password } = parsed.data;
     
-    // 1. Try to find user in Prisma (Custom Backend - Primary)
-    let user = null;
-    let userId = null;
-
-    try {
-      const where = email ? { email: email.toLowerCase().trim() } : { phone };
-      console.log(`🔍 Attempting login for: ${email || phone}`);
-      user = await req.prisma.user.findUnique({ where });
-      
-      if (user) {
-        userId = user.id;
-        console.log(`✅ SQL FOUND: ID=${user.id}, ROLE=${user.role}, STATUS=${user.status}`);
-      } else {
-        console.log(`❌ SQL MISS: Not found in Prisma`);
+    const where = email ? { email: email.toLowerCase().trim() } : { phone };
+    console.log(`🔍 Attempting login for: ${email || phone}`);
+    
+    const user = await req.prisma.user.findUnique({ 
+      where,
+      include: {
+        vendorProfile: true,
+        riderProfile: true,
+        customerProfile: true
       }
-    } catch (prismaErr) {
-      console.error('❌ SQL ERROR:', prismaErr.message);
-    }
-
-    // 2. Fallback to Firestore (Secondary/Migration mode)
-    if (!user && db && email) {
-      try {
-        const userSnapshot = await db.collection('users').where('email', '==', email.toLowerCase().trim()).limit(1).get();
-        if (!userSnapshot.empty) {
-          const userDoc = userSnapshot.docs[0];
-          user = userDoc.data();
-          userId = userDoc.id;
-          console.log(`📡 FIRESTORE FOUND: ${email}`);
-        }
-      } catch (firestoreErr) {
-        console.warn('⚠️ FIRESTORE ERROR:', firestoreErr.message);
-      }
-    }
-
+    });
+    
     if (!user) {
-      console.log(`🚫 AUTH FAILED: User account not found in any source.`);
+      console.log(`🚫 AUTH FAILED: User account not found.`);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -77,39 +53,45 @@ router.post('/login', async (req, res) => {
     if (user.isActive === false) return res.status(403).json({ error: 'Account is deactivated' });
 
     // Validate password
-    if (user.password) {
-      const isValid = await bcrypt.compare(password, user.password);
-      console.log(`🔑 PASSWORD CHECK: ${isValid ? 'SUCCESS' : 'FAILURE'}`);
-      if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
-    } else {
-      console.log(`🚫 AUTH FAILED: User found but has NO password field (Internal/Social account).`);
-      return res.status(401).json({ error: 'This account requires Social Login' });
-    }
+    const isValid = await bcrypt.compare(password, user.password);
+    console.log(`🔑 PASSWORD CHECK: ${isValid ? 'SUCCESS' : 'FAILURE'}`);
+    
+    if (!isValid) return res.status(401).json({ error: 'Invalid email or password' });
 
     const token = jwt.sign(
-      { id: userId, role: user.role, tenantId: user.tenantId },
-      process.env.JWT_SECRET,
+      { id: user.id, role: user.role, tenantId: user.tenantId },
+      process.env.JWT_SECRET || 'your_jwt_secret',
       { expiresIn: '24h' }
     );
 
-    // Log login (Silent failure)
+    // Log login
     try {
-      if (db) {
-        await db.collection('systemLogs').add({ 
-          userId, 
-          tenantId: user.tenantId, 
-          action: 'LOGIN', 
-          details: `${user.role} login via bridge`, 
-          createdAt: new Date().toISOString() 
-        });
-      }
+      await req.prisma.systemLog.create({
+        data: {
+          userId: user.id,
+          tenantId: user.tenantId,
+          action: 'LOGIN',
+          details: `${user.role} login via Custom Auth`,
+        }
+      });
     } catch (e) {
-      console.warn('⚠️ Firestore logging failed:', e.message);
+      console.warn('⚠️ Logging failed:', e.message);
     }
 
     res.json({
       token,
-      user: { id: userId, name: user.name, email: user.email, role: user.role, tenantId: user.tenantId, darkMode: user.darkMode, avatar: user.avatar }
+      user: { 
+        id: user.id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role, 
+        tenantId: user.tenantId, 
+        darkMode: user.darkMode, 
+        avatar: user.avatar,
+        vendorProfile: user.vendorProfile,
+        riderProfile: user.riderProfile,
+        customerProfile: user.customerProfile
+      }
     });
   } catch (err) { 
     console.error('Login Error:', err);
@@ -133,17 +115,26 @@ router.post('/register', async (req, res) => {
     const status = (role === 'CUSTOMER' || !role) ? 'APPROVED' : 'PENDING';
 
     const user = await req.prisma.user.create({
-      data: { name, email, phone, password: hashedPassword, role: role || 'CUSTOMER', tenantId: tenantId || null, status }
+      data: { 
+        name, 
+        email: email.toLowerCase().trim(), 
+        phone, 
+        password: hashedPassword, 
+        role: role || 'CUSTOMER', 
+        tenantId: tenantId || null, 
+        status 
+      }
     });
 
     // Auto-create wallet for customers
     if (user.role === 'CUSTOMER') {
       await req.prisma.wallet.create({ data: { userId: user.id, balance: 0 } }).catch(() => {});
+      await req.prisma.customerProfile.create({ data: { userId: user.id } }).catch(() => {});
     }
 
     const token = jwt.sign(
       { id: user.id, role: user.role, tenantId: user.tenantId },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your_jwt_secret',
       { expiresIn: '24h' }
     );
 
@@ -151,16 +142,19 @@ router.post('/register', async (req, res) => {
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, tenantId: user.tenantId }
     });
-  } catch (err) { res.status(500).json({ error: 'Internal server error' }); }
+  } catch (err) { 
+    console.error('Register Error:', err);
+    res.status(500).json({ error: 'Internal server error' }); 
+  }
 });
 
-// POST /api/auth/otp/send — send OTP via email or phone
+// POST /api/auth/otp/send
 router.post('/otp/send', async (req, res) => {
   try {
     const { email, phone } = req.body;
     if (!email && !phone) return res.status(400).json({ error: 'Email or phone required' });
 
-    const where = email ? { email } : { phone };
+    const where = email ? { email: email.toLowerCase().trim() } : { phone };
     const user = await req.prisma.user.findFirst({ where });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
@@ -169,21 +163,19 @@ router.post('/otp/send', async (req, res) => {
 
     await req.prisma.user.update({ where: { id: user.id }, data: { otpCode: otp, otpExpiry: expiry } });
 
-    // In production: send via Twilio (SMS) or Nodemailer (email)
-    // For now, log it and return success
     console.log(`[OTP] User ${user.email}: ${otp}`);
 
     res.json({ message: `OTP sent to ${email || phone}`, debug_otp: process.env.NODE_ENV !== 'production' ? otp : undefined });
   } catch (err) { res.status(500).json({ error: 'Failed to send OTP' }); }
 });
 
-// POST /api/auth/otp/verify — verify OTP and login
+// POST /api/auth/otp/verify
 router.post('/otp/verify', async (req, res) => {
   try {
     const { email, phone, otp } = req.body;
     if (!otp) return res.status(400).json({ error: 'OTP required' });
 
-    const where = email ? { email } : { phone };
+    const where = email ? { email: email.toLowerCase().trim() } : { phone };
     const user = await req.prisma.user.findFirst({ where });
     if (!user) return res.status(404).json({ error: 'User not found' });
     if (!user.otpCode || user.otpCode !== otp) return res.status(401).json({ error: 'Invalid OTP' });
@@ -194,7 +186,7 @@ router.post('/otp/verify', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, role: user.role, tenantId: user.tenantId },
-      process.env.JWT_SECRET,
+      process.env.JWT_SECRET || 'your_jwt_secret',
       { expiresIn: '24h' }
     );
 
@@ -212,53 +204,56 @@ router.get('/me', async (req, res) => {
     if (!authHeader) return res.status(401).json({ error: 'No token' });
 
     const token = authHeader.split(' ')[1];
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (e) {
-    // Fallback: try to verify as Firebase token
-    try {
-      decoded = await admin.auth().verifyIdToken(token);
-      decoded.id = decoded.uid; // normalization
-    } catch (e) {
-      return res.status(401).json({ error: 'Auth failed: Token is neither valid JWT nor Firebase' });
-    }
-    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
 
-    // Try Firestore first
-    const userDoc = await db.collection('users').doc(decoded.id).get();
-    
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      return res.json({ id: userDoc.id, ...userData });
-    }
+    const user = await req.prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: {
+        vendorProfile: true,
+        riderProfile: true,
+        customerProfile: true,
+        tenant: true
+      }
+    });
 
-    // Try Prisma fallback
-    try {
-      const user = await req.prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: { id: true, name: true, email: true, phone: true, role: true, tenantId: true, avatar: true, darkMode: true }
-      });
-      if (user) return res.json(user);
-    } catch (prismaErr) {}
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user.isActive) return res.status(403).json({ error: 'Account is deactivated' });
 
-    res.status(404).json({ error: 'User not found' });
-  } catch (err) { res.status(401).json({ error: 'Invalid token: ' + err.message }); }
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      avatar: user.avatar,
+      darkMode: user.darkMode,
+      vendorProfile: user.vendorProfile,
+      riderProfile: user.riderProfile,
+      customerProfile: user.customerProfile,
+      tenant: user.tenant
+    });
+  } catch (err) { 
+    res.status(401).json({ error: 'Invalid token: ' + err.message }); 
+  }
 });
 
-// PUT /api/auth/preferences — dark mode toggle, avatar
+// PUT /api/auth/preferences
 router.put('/preferences', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: 'No token' });
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
 
     const { darkMode, avatar, name } = req.body;
     const user = await req.prisma.user.update({
       where: { id: decoded.id },
-      data: { ...(darkMode !== undefined && { darkMode }), ...(avatar && { avatar }), ...(name && { name }) },
+      data: { 
+        ...(darkMode !== undefined && { darkMode }), 
+        ...(avatar && { avatar }), 
+        ...(name && { name }) 
+      },
       select: { id: true, name: true, darkMode: true, avatar: true }
     });
     res.json(user);

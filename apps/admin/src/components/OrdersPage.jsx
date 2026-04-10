@@ -4,8 +4,7 @@ import {
   ChevronDown, Download, Filter, Search, Printer, FileText,
   Clock, CheckCircle, Truck, XCircle, MoreHorizontal
 } from 'lucide-react';
-import { db } from '@shared/firebase.js';
-import { doc, updateDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { API } from '../App.jsx';
 
 const STATUS_MAP = {
   PENDING:    { label:'Pending',     badge:'badge-warning',  icon: Clock },
@@ -42,54 +41,70 @@ export default function OrdersPage({ orders = [], onRefresh, headers, activeTena
     return true;
   });
 
-  // ─── Firestore Actions ─────────────────
+  // ─── API Actions ─────────────────
   const duplicateOrder = async (order) => {
     try {
       const { id, ...data } = order;
-      await addDoc(collection(db, 'orders'), {
-        ...data,
-        status: 'PENDING',
-        createdAt: serverTimestamp(),
-        deletedAt: null,
-        renamedTo: null,
-        tenantId: activeTenant?.id || order.tenantId
+      await fetch(`${API}/api/pos/orders`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ ...data, status: 'PENDING' })
       });
+      onRefresh();
       setContextMenu(null);
-    } catch (e) { alert('Duplicate failed: ' + e.message); }
+    } catch (e) { alert('Duplicate failed'); }
   };
 
   const softDelete = async (id) => {
     try {
-      await updateDoc(doc(db, 'orders', id), { deletedAt: new Date().toISOString() });
+      await fetch(`${API}/api/pos/orders/${id}`, {
+        method: 'DELETE',
+        headers: headers()
+      });
+      onRefresh();
       setContextMenu(null);
     } catch (e) { alert('Delete failed'); }
   };
 
+  const permanentDelete = async (id) => {
+    if (!confirm('⚠️ Delete this order permanently?')) return;
+    try {
+      await fetch(`${API}/api/pos/orders/${id}/permanent`, {
+        method: 'DELETE',
+        headers: headers()
+      });
   const restoreOrder = async (id) => {
     try {
-      await updateDoc(doc(db, 'orders', id), { deletedAt: null });
+      await fetch(`${API}/api/pos/orders/${id}/restore`, {
+        method: 'POST',
+        headers: headers()
+      });
+      onRefresh();
     } catch (e) { alert('Restore failed'); }
-  };
-
-  const permanentDelete = async (id) => {
-    if (!confirm('⚠️ This will permanently delete this order. Are you sure?')) return;
-    try {
-      await deleteDoc(doc(db, 'orders', id));
-    } catch (e) { alert('Delete failed'); }
   };
 
   const renameOrder = async (id) => {
     if (!renameVal.trim()) return;
     try {
-      await updateDoc(doc(db, 'orders', id), { renamedTo: renameVal.trim() });
+      await fetch(`${API}/api/pos/orders/${id}/rename`, {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ renamedTo: renameVal.trim() })
+      });
       setShowRename(null);
       setRenameVal('');
+      onRefresh();
     } catch (e) { alert('Rename failed'); }
   };
 
   const changeStatus = async (id, newStatus) => {
     try {
-      await updateDoc(doc(db, 'orders', id), { status: newStatus });
+      await fetch(`${API}/api/pos/orders/${id}/status`, {
+        method: 'PUT',
+        headers: headers(),
+        body: JSON.stringify({ status: newStatus })
+      });
+      onRefresh();
       setContextMenu(null);
     } catch (e) { alert('Status update failed'); }
   };
