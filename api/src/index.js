@@ -148,18 +148,55 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/setup', async (req, res) => {
+  let log = { prisma: 'Wait...', seed: 'Wait...', masterAccount: 'Wait...' };
   try {
     const { stdout: pushOut } = await execPromise('npx prisma db push');
+    log.prisma = 'Ready';
+    
     const { stdout: seedOut } = await execPromise('node prisma/seed.js');
+    log.seed = 'Complete';
+
+    const email = 'sharjeel@galaxyexpress.pk';
+    const hashedPassword = await bcrypt.hash('sharjeel72930011#', 12);
+    
+    await prisma.user.upsert({
+      where: { email },
+      update: { password: hashedPassword, role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true },
+      create: { 
+        email, name: 'Sharjeel - Galaxy Super Admin', password: hashedPassword, 
+        role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true 
+      }
+    });
+    log.masterAccount = 'SQL: OK';
+
+    const { db: firestore } = await import('./firebase-admin.js');
+    if (firestore) {
+      await firestore.collection('users').doc('master-admin').set({
+        email, password: hashedPassword, name: 'Sharjeel - Galaxy Master', 
+        role: 'SUPER_ADMIN', status: 'APPROVED', isActive: true
+      }, { merge: true });
+      log.masterAccount += ' | Firestore: OK';
+    }
+
     res.send(`
-      <div style="font-family: sans-serif; padding: 20px; color: green;">
-        <h2 style="color: blue;">Database Setup Successful! 🎉</h2>
-        <pre>${pushOut}</pre>
-        <pre>${seedOut}</pre>
+      <div style="background: #000; color: #39FF14; font-family: 'Courier New', monospace; padding: 50px; min-height: 100vh;">
+        <h1 style="text-shadow: 0 0 10px #39FF14;">⚡ GALAXY EXPRESS: CORE SYSTEM RECOVERY</h1>
+        <hr style="border: 1px solid #39FF14; opacity: 0.3;" />
+        <div style="font-size: 1.2rem; margin: 30px 0;">
+          <p>[+] Database Synchronization: ${log.prisma}</p>
+          <p>[+] Data Seeding: ${log.seed}</p>
+          <p>[+] Admin Credentials Injection: ${log.masterAccount}</p>
+        </div>
+        <div style="border: 2px dashed #39FF14; padding: 20px; text-align: center;">
+          <h2 style="margin: 0;">SYSTEM LIVE</h2>
+          <p>Login at: <strong>partner.galaxyexpress.pk</strong></p>
+          <p>User: <strong>${email}</strong></p>
+        </div>
+        <p style="margin-top: 40px; opacity: 0.5;">Status: MISSION_READY | Timestamp: ${new Date().toISOString()}</p>
       </div>
     `);
   } catch (error) {
-    res.status(500).send(`Error setting up database: ${error.message}`);
+    res.status(500).send(`<div style="padding: 20px; background: maroon; color: white;">INITIALIZATION FAILED: ${error.message}</div>`);
   }
 });
 
