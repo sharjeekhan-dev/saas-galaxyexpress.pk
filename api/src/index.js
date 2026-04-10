@@ -213,35 +213,37 @@ app.get('/api/setup/bypass', async (req, res) => {
     const auth = admin.auth();
     const firestore = admin.firestore();
     
-    // 1. Ensure User In Firebase Auth
-    let fbUser;
-    try {
-      fbUser = await auth.getUserByEmail(email);
-      await auth.updateUser(fbUser.uid, { password: pass });
-    } catch {
-      fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
-    }
-
-    // 2. Sync Firestore Record (Only if credentials exist)
-    let syncStatus = "Identity Synchronized ✓";
+    // 1. Attempt Firebase Auth / Firestore Sync with full crash-safety
+    let fbUser = { uid: 'master-offline-id' }; // Fallback ID if Firebase is completely dead
+    let syncStatus = "Recovery Mode Active (Local Auth Only)";
     let customToken = null;
-    
-    if (admin.apps[0]?.options?.credential) {
-      try {
-        await firestore.collection('users').doc(fbUser.uid).set({
-          email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
-          status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
-        }, { merge: true });
-        customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
-      } catch (e) {
-        console.warn("Firestore sync skipped:", e.message);
-        syncStatus = "Recovery Mode Active (Local Auth Only)";
+
+    try {
+      if (admin.apps.length > 0 && admin.apps[0].options.credential) {
+        try {
+          fbUser = await auth.getUserByEmail(email);
+          await auth.updateUser(fbUser.uid, { password: pass });
+        } catch (e) {
+          fbUser = await auth.createUser({ email, password: pass, displayName: 'Sharjeel Khan' });
+        }
+
+        try {
+          await firestore.collection('users').doc(fbUser.uid).set({
+            email, name: 'Sharjeel - Galaxy Master', role: 'SUPER_ADMIN', 
+            status: 'APPROVED', isActive: true, createdAt: new Date().toISOString()
+          }, { merge: true });
+          customToken = await auth.createCustomToken(fbUser.uid, { role: 'SUPER_ADMIN' });
+          syncStatus = "Identity Synchronized ✓";
+        } catch (e) {
+          console.warn("Firestore sync skipped:", e.message);
+        }
       }
-    } else {
-      syncStatus = "Recovery Mode Active (Firebase Creds Missing)";
+    } catch (globalFbErr) {
+      console.error("🔥 Critical Firebase SDK Failure during bypass:", globalFbErr.message);
+      syncStatus = "Firebase Cluster Offline (Local Session Active)";
     }
 
-    // 3. Generate Local JWT
+    // 2. Generate Local JWT (Always works regardless of Firebase)
     const masterPayload = { id: fbUser.uid, role: 'SUPER_ADMIN', tenantId: null };
     const token = jwt.sign(masterPayload, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '24h' });
     const user = { id: fbUser.uid, name: 'Sharjeel - System Master', email, role: 'SUPER_ADMIN' };
@@ -284,11 +286,15 @@ app.get('/api/setup/bypass', async (req, res) => {
               
               if (customToken) {
                 addLog("Contacting Firebase Authorization Cluster...");
-                const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
-                const auth = getAuth(app);
-                addLog("Validating Master Credentials...");
-                await signInWithCustomToken(auth, customToken);
-                addLog("Firebase Auth Handshake: SUCCESS", "#fff");
+                try {
+                  const app = getApps().length === 0 ? initializeApp(config) : getApps()[0];
+                  const auth = getAuth(app);
+                  addLog("Validating Master Credentials...");
+                  await signInWithCustomToken(auth, customToken);
+                  addLog("Firebase Auth Handshake: SUCCESS", "#fff");
+                } catch (e) {
+                  addLog("Warning: Firebase Handshake Skipped: " + e.message, "#f97316");
+                }
               } else {
                 addLog("NOTICE: Proceeding with Local Identity Node (Real-time restricted)", "#0ea5e9");
               }
