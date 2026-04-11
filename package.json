@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@dataconnect/generated": "file:src/dataconnect-generated",
-    "lucide-react": "^1.7.0"
+    "lucide-react": "^1.7.0",
+    "firebase": "10.12.0"
   }
 }
